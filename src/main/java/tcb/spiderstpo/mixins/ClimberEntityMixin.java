@@ -581,7 +581,7 @@ public abstract class ClimberEntityMixin extends Monster implements IClimberEnti
 	private void forEachClimbableCollisonBox(AABB aabb, Shapes.DoubleLineConsumer action) {
 		CollisionGetter cachedCollisionReader = new CachedCollisionReader(this.level, aabb);
 
-		Stream<VoxelShape> shapes = (Stream<VoxelShape>) cachedCollisionReader.getBlockCollisions(this, aabb);
+		Iterable<VoxelShape> shapes =  cachedCollisionReader.getBlockCollisions(this, aabb);
 
 		shapes.forEach(shape -> shape.forAllBoxes(action));
 	}

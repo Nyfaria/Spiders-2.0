@@ -31,7 +31,7 @@ public class CachedCollisionReader implements CollisionGetter {
 		this.width = maxChunkX - this.minChunkX + 1;
 		int depth = maxChunkZ - this.minChunkZ + 1;
 
-		BlockGetter[] blockReaderCache = new LevelReader[width * depth];
+		BlockGetter[] blockReaderCache = new BlockGetter[width * depth];
 
 		for(int cx = minChunkX; cx <= maxChunkX; cx++) {
 			for(int cz = minChunkZ; cz <= maxChunkZ; cz++) {
