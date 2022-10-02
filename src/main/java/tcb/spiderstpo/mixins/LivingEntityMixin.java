@@ -1,59 +1,57 @@
 package tcb.spiderstpo.mixins;
 
+import net.minecraft.commands.arguments.EntityAnchorArgument;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-
-import net.minecraft.command.arguments.EntityAnchorArgument;
-import net.minecraft.command.arguments.EntityAnchorArgument.Type;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.network.datasync.DataParameter;
-import net.minecraft.util.math.vector.Vector3d;
-import tcb.spiderstpo.common.entity.mob.ILivingEntityDataManagerHook;
 import tcb.spiderstpo.common.entity.mob.ILivingEntityJumpHook;
 import tcb.spiderstpo.common.entity.mob.ILivingEntityLookAtHook;
 import tcb.spiderstpo.common.entity.mob.ILivingEntityTravelHook;
+import tcb.spiderstpo.common.entity.mob.ILivingSynchedEntityDataHook;
 
 @Mixin(LivingEntity.class)
-public abstract class LivingEntityMixin implements ILivingEntityLookAtHook, ILivingEntityDataManagerHook, ILivingEntityTravelHook, ILivingEntityJumpHook {
-	@ModifyVariable(method = "lookAt(Lnet/minecraft/command/arguments/EntityAnchorArgument$Type;Lnet/minecraft/util/math/vector/Vector3d;)V", at = @At("HEAD"), ordinal = 0)
-	private Vector3d onLookAtModify(Vector3d vec, EntityAnchorArgument.Type anchor, Vector3d vec2) {
+public abstract class LivingEntityMixin implements ILivingEntityLookAtHook, ILivingSynchedEntityDataHook, ILivingEntityTravelHook, ILivingEntityJumpHook {
+	@ModifyVariable(method = "lookAt", at = @At("HEAD"), ordinal = 0)
+	private Vec3 onLookAtModify(Vec3 vec, EntityAnchorArgument.Anchor anchor, Vec3 vec2) {
 		return this.onLookAt(anchor, vec);
 	}
 
 	@Override
-	public Vector3d onLookAt(Type anchor, Vector3d vec) {
+	public Vec3 onLookAt(EntityAnchorArgument.Anchor anchor, Vec3 vec) {
 		return vec;
 	}
 
-	@Inject(method = "notifyDataManagerChange(Lnet/minecraft/network/datasync/DataParameter;)V", at = @At("HEAD"))
-	private void onNotifyDataManagerChange(DataParameter<?> key, CallbackInfo ci) {
+	@Inject(method = "onSyncedDataUpdated", at = @At("HEAD"))
+	private void onNotifyDataManagerChange(EntityDataAccessor<?> key, CallbackInfo ci) {
 		this.onNotifyDataManagerChange(key);
 	}
 
 	@Override
-	public void onNotifyDataManagerChange(DataParameter<?> key) { }
+	public void onNotifyDataManagerChange(EntityDataAccessor<?> key) { }
 
-	@Inject(method = "travel(Lnet/minecraft/util/math/vector/Vector3d;)V", at = @At("HEAD"), cancellable = true)
-	private void onTravelPre(Vector3d relative, CallbackInfo ci) {
+	@Inject(method = "travel", at = @At("HEAD"), cancellable = true)
+	private void onTravelPre(Vec3 relative, CallbackInfo ci) {
 		if(this.onTravel(relative, true)) {
 			ci.cancel();
 		}
 	}
 
-	@Inject(method = "travel(Lnet/minecraft/util/math/vector/Vector3d;)V", at = @At("RETURN"))
-	private void onTravelPost(Vector3d relative, CallbackInfo ci) {
+	@Inject(method = "travel", at = @At("RETURN"))
+	private void onTravelPost(Vec3 relative, CallbackInfo ci) {
 		this.onTravel(relative, false);
 	}
 
 	@Override
-	public boolean onTravel(Vector3d relative, boolean pre) {
+	public boolean onTravel(Vec3 relative, boolean pre) {
 		return false;
 	}
 
-	@Inject(method = "jump()V", at = @At("HEAD"), cancellable = true)
+	@Inject(method = "jumpFromGround", at = @At("HEAD"), cancellable = true)
 	private void onJump(CallbackInfo ci) {
 		if(this.onJump()) {
 			ci.cancel();

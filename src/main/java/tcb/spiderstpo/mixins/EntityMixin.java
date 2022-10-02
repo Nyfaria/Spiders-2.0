@@ -1,5 +1,10 @@
 package tcb.spiderstpo.mixins;
 
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -7,36 +12,30 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.MoverType;
-import net.minecraft.nbt.CompoundNBT;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.vector.Vector3d;
 import tcb.spiderstpo.common.entity.mob.IEntityMovementHook;
 import tcb.spiderstpo.common.entity.mob.IEntityReadWriteHook;
 import tcb.spiderstpo.common.entity.mob.IEntityRegisterDataHook;
 
 @Mixin(Entity.class)
 public abstract class EntityMixin implements IEntityMovementHook, IEntityReadWriteHook, IEntityRegisterDataHook {
-	@Inject(method = "move(Lnet/minecraft/entity/MoverType;Lnet/minecraft/util/math/vector/Vector3d;)V", at = @At("HEAD"), cancellable = true)
-	private void onMovePre(MoverType type, Vector3d pos, CallbackInfo ci) {
+	@Inject(method = "move", at = @At("HEAD"), cancellable = true)
+	private void onMovePre(MoverType type, Vec3 pos, CallbackInfo ci) {
 		if(this.onMove(type, pos, true)) {
 			ci.cancel();
 		}
 	}
 
-	@Inject(method = "move(Lnet/minecraft/entity/MoverType;Lnet/minecraft/util/math/vector/Vector3d;)V", at = @At("RETURN"))
-	private void onMovePost(MoverType type, Vector3d pos, CallbackInfo ci) {
+	@Inject(method = "move", at = @At("RETURN"))
+	private void onMovePost(MoverType type, Vec3 pos, CallbackInfo ci) {
 		this.onMove(type, pos, false);
 	}
 
 	@Override
-	public boolean onMove(MoverType type, Vector3d pos, boolean pre) {
+	public boolean onMove(MoverType type, Vec3 pos, boolean pre) {
 		return false;
 	}
 
-	@Inject(method = "getOnPosition()Lnet/minecraft/util/math/BlockPos;", at = @At("RETURN"), cancellable = true)
+	@Inject(method = "getOnPos", at = @At("RETURN"), cancellable = true)
 	private void onGetOnPosition(CallbackInfoReturnable<BlockPos> ci) {
 		BlockPos adjusted = this.getAdjustedOnPosition(ci.getReturnValue());
 		if(adjusted != null) {
@@ -49,49 +48,50 @@ public abstract class EntityMixin implements IEntityMovementHook, IEntityReadWri
 		return null;
 	}
 
-	@Inject(method = "canTriggerWalking()Z", at = @At("RETURN"), cancellable = true)
-	private void onCanTriggerWalking(CallbackInfoReturnable<Boolean> ci) {
-		ci.setReturnValue(this.getAdjustedCanTriggerWalking(ci.getReturnValue()));
-	}
+//todo:figure out
+//	@Inject(method = "", at = @At("RETURN"), cancellable = true)
+//	private void onCanTriggerWalking(CallbackInfoReturnable<Boolean> ci) {
+//		ci.setReturnValue(this.getAdjustedCanTriggerWalking(ci.getReturnValue()));
+//	}
 
 	@Override
 	public boolean getAdjustedCanTriggerWalking(boolean canTriggerWalking) {
 		return canTriggerWalking;
 	}
 
-	@Inject(method = "read(Lnet/minecraft/nbt/CompoundNBT;)V", at = @At(
+	@Inject(method = "load", at = @At(
 			value = "INVOKE",
-			target = "Lnet/minecraft/entity/Entity;readAdditional(Lnet/minecraft/nbt/CompoundNBT;)V",
+			target = "Lnet/minecraft/world/entity/Entity;readAdditionalSaveData(Lnet/minecraft/nbt/CompoundTag;)V",
 			shift = At.Shift.AFTER
 			))
-	private void onRead(CompoundNBT nbt, CallbackInfo ci) {
+	private void onRead(CompoundTag nbt, CallbackInfo ci) {
 		this.onRead(nbt);
 	}
 
 	@Override
-	public void onRead(CompoundNBT nbt) { }
+	public void onRead(CompoundTag nbt) { }
 
-	@Inject(method = "writeWithoutTypeId(Lnet/minecraft/nbt/CompoundNBT;)Lnet/minecraft/nbt/CompoundNBT;", at = @At(
+	@Inject(method = "saveWithoutId", at = @At(
 			value = "INVOKE",
-			target = "Lnet/minecraft/entity/Entity;writeAdditional(Lnet/minecraft/nbt/CompoundNBT;)V",
+			target = "Lnet/minecraft/world/entity/Entity;addAdditionalSaveData(Lnet/minecraft/nbt/CompoundTag;)V",
 			shift = At.Shift.AFTER
 			))
-	private void onWrite(CompoundNBT nbt, CallbackInfoReturnable<CompoundNBT> ci) {
+	private void onWrite(CompoundTag nbt, CallbackInfoReturnable<CompoundTag> ci) {
 		this.onWrite(nbt);
 	}
 
 	@Override
-	public void onWrite(CompoundNBT nbt) { }
+	public void onWrite(CompoundTag nbt) { }
 
 	@Shadow(prefix = "shadow$")
-	private void shadow$registerData() { }
+	protected void shadow$defineSynchedData() { }
 
 	@Redirect(method = "<init>*", at = @At(
 			value = "INVOKE",
-			target = "Lnet/minecraft/entity/Entity;registerData()V"
+			target = "Lnet/minecraft/world/entity/Entity;defineSynchedData()V"
 			))
 	private void onRegisterData(Entity _this) {
-		this.shadow$registerData();
+		this.shadow$defineSynchedData();
 		
 		if(_this == (Object) this) {
 			this.onRegisterData();

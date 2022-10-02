@@ -1,5 +1,8 @@
 package tcb.spiderstpo.mixins;
 
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -7,18 +10,14 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-
-import net.minecraft.entity.MobEntity;
-import net.minecraft.pathfinding.PathNavigator;
-import net.minecraft.world.World;
 import tcb.spiderstpo.common.entity.mob.IMobEntityLivingTickHook;
 import tcb.spiderstpo.common.entity.mob.IMobEntityNavigatorHook;
 import tcb.spiderstpo.common.entity.mob.IMobEntityRegisterGoalsHook;
 import tcb.spiderstpo.common.entity.mob.IMobEntityTickHook;
 
-@Mixin(MobEntity.class)
+@Mixin(Mob.class)
 public abstract class MobEntityMixin implements IMobEntityLivingTickHook, IMobEntityTickHook, IMobEntityRegisterGoalsHook, IMobEntityNavigatorHook {
-	@Inject(method = "livingTick()V", at = @At("HEAD"))
+	@Inject(method = "tick", at = @At("HEAD"))
 	private void onLivingTick(CallbackInfo ci) {
 		this.onLivingTick();
 	}
@@ -39,9 +38,9 @@ public abstract class MobEntityMixin implements IMobEntityLivingTickHook, IMobEn
 
 	@Redirect(method = "<init>*", at = @At(
 			value = "INVOKE",
-			target = "Lnet/minecraft/entity/MobEntity;registerGoals()V"
+			target = "Lnet/minecraft/world/entity/Mob;registerGoals()V"
 			))
-	private void onRegisterGoals(MobEntity _this) {
+	private void onRegisterGoals(Mob _this) {
 		this.shadow$registerGoals();
 
 		if(_this == (Object) this) {
@@ -52,16 +51,16 @@ public abstract class MobEntityMixin implements IMobEntityLivingTickHook, IMobEn
 	@Override
 	public void onRegisterGoals() { }
 
-	@Inject(method = "createNavigator(Lnet/minecraft/world/World;)Lnet/minecraft/pathfinding/PathNavigator;", at = @At("HEAD"), cancellable = true)
-	private void onCreateNavigator(World world, CallbackInfoReturnable<PathNavigator> ci) {
-		PathNavigator navigator = this.onCreateNavigator(world);
+	@Inject(method = "createNavigation", at = @At("HEAD"), cancellable = true)
+	private void onCreateNavigator(Level world, CallbackInfoReturnable<PathNavigation> ci) {
+		PathNavigation navigator = this.onCreateNavigator(world);
 		if(navigator != null) {
 			ci.setReturnValue(navigator);
 		}
 	}
 
 	@Override
-	public PathNavigator onCreateNavigator(World world) {
+	public PathNavigation onCreateNavigator(Level world) {
 		return null;
 	}
 }

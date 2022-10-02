@@ -10,12 +10,12 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
-import net.minecraft.pathfinding.NodeProcessor;
-import net.minecraft.pathfinding.Path;
-import net.minecraft.pathfinding.PathNodeType;
-import net.minecraft.pathfinding.PathPoint;
-import net.minecraft.util.Direction;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.pathfinder.NodeEvaluator;
+import net.minecraft.world.level.pathfinder.Path;
+import net.minecraft.world.level.pathfinder.BlockPathTypes;
+import net.minecraft.world.level.pathfinder.Node;
+import net.minecraft.core.Direction;
+import net.minecraft.core.BlockPos;
 
 public class AdvancedPathFinder extends CustomPathFinder {
 	private static class Node {
@@ -75,13 +75,14 @@ public class AdvancedPathFinder extends CustomPathFinder {
 
 	private static final Direction[] DOWN = new Direction[] { Direction.DOWN };
 
-	public AdvancedPathFinder(NodeProcessor processor, int maxExpansions) {
+	public AdvancedPathFinder(NodeEvaluator processor, int maxExpansions) {
 		super(processor, maxExpansions);
 	}
 
+
 	@Override
-	protected Path createPath(PathPoint _targetPoint, BlockPos target, boolean isTargetReached) {
-		List<PathPoint> points = new ArrayList<>();
+	protected Path createPath(net.minecraft.world.level.pathfinder.Node _targetPoint, BlockPos target, boolean isTargetReached) {
+		List<net.minecraft.world.level.pathfinder.Node> points = new ArrayList<>();
 
 		//Backtrack path from target point back to entity
 		this.backtrackPath(points, _targetPoint);
@@ -101,17 +102,17 @@ public class AdvancedPathFinder extends CustomPathFinder {
 		return new Path(points, target, isTargetReached);
 	}
 
-	private void backtrackPath(List<PathPoint> points, PathPoint start) {
-		PathPoint currentPathPoint = start;
+	private void backtrackPath(List<net.minecraft.world.level.pathfinder.Node> points, net.minecraft.world.level.pathfinder.Node start) {
+		net.minecraft.world.level.pathfinder.Node currentPathPoint = start;
 		points.add(start);
 
-		while(currentPathPoint.previous != null) {
-			currentPathPoint = currentPathPoint.previous;
+		while(currentPathPoint.cameFrom != null) {
+			currentPathPoint = currentPathPoint.cameFrom;
 			points.add(currentPathPoint);
 		}
 	}
 
-	private void backtrackPath(List<PathPoint> points, Node start) {
+	private void backtrackPath(List<net.minecraft.world.level.pathfinder.Node> points, Node start) {
 		Node currentNode = start;
 		points.add(start.pathPoint);
 
@@ -130,10 +131,10 @@ public class AdvancedPathFinder extends CustomPathFinder {
 	}
 
 	private static boolean isOmnidirectionalPoint(DirectionalPathPoint point) {
-		return point.nodeType == PathNodeType.WATER || point.nodeType == PathNodeType.LAVA;
+		return point.type == BlockPathTypes.WATER || point.type == BlockPathTypes.LAVA;
 	}
 
-	private Node retraceSidedPath(List<PathPoint> points, boolean isReversed) {
+	private Node retraceSidedPath(List<net.minecraft.world.level.pathfinder.Node> points, boolean isReversed) {
 		if(points.isEmpty()) {
 			return null;
 		}
@@ -200,7 +201,7 @@ public class AdvancedPathFinder extends CustomPathFinder {
 							//Allow movement around corners, but insert new point with transitional side inbetween
 
 							Node intermediary;
-							if(Math.abs(currentSide.getXOffset()) == adx && Math.abs(currentSide.getYOffset()) == ady && Math.abs(currentSide.getZOffset()) == adz) {
+							if(Math.abs(currentSide.getStepX()) == adx && Math.abs(currentSide.getStepY()) == ady && Math.abs(currentSide.getStepZ()) == adz) {
 								intermediary = new Node(current, current.pathPoint.assignPathSide(nextSide));
 							} else {
 								intermediary = new Node(current, next.assignPathSide(currentSide));
@@ -212,7 +213,7 @@ public class AdvancedPathFinder extends CustomPathFinder {
 					} else if(d == 2) {
 						//Diagonal
 
-						int currentSidePlaneMatch = (currentSide.getXOffset() == -dx ? 1 : 0) + (currentSide.getYOffset() == -dy ? 1 : 0) + (currentSide.getZOffset() == -dz ? 1 : 0);
+						int currentSidePlaneMatch = (currentSide.getStepX() == -dx ? 1 : 0) + (currentSide.getStepY() == -dy ? 1 : 0) + (currentSide.getStepZ() == -dz ? 1 : 0);
 
 						if(currentSide == nextSide && currentSidePlaneMatch == 0) {
 
@@ -225,14 +226,14 @@ public class AdvancedPathFinder extends CustomPathFinder {
 							Node intermediary = null;
 							if(currentSidePlaneMatch == 2) {
 								for(Direction intermediarySide : getPathableSidesWithFallback(current.pathPoint)) {
-									if(intermediarySide != currentSide && (intermediarySide.getXOffset() == dx ? 1 : 0) + (intermediarySide.getYOffset() == dy ? 1 : 0) + (intermediarySide.getZOffset() == dz ? 1 : 0) == 2) {
+									if(intermediarySide != currentSide && (intermediarySide.getStepX() == dx ? 1 : 0) + (intermediarySide.getStepY() == dy ? 1 : 0) + (intermediarySide.getStepZ() == dz ? 1 : 0) == 2) {
 										intermediary = new Node(current, current.pathPoint.assignPathSide(intermediarySide));
 										break;
 									}
 								}
 							} else {
 								for(Direction intermediarySide : getPathableSidesWithFallback(next)) {
-									if(intermediarySide != nextSide && (intermediarySide.getXOffset() == -dx ? 1 : 0) + (intermediarySide.getYOffset() == -dy ? 1 : 0) + (intermediarySide.getZOffset() == -dz ? 1 : 0) == 2) {
+									if(intermediarySide != nextSide && (intermediarySide.getStepX() == -dx ? 1 : 0) + (intermediarySide.getStepY() == -dy ? 1 : 0) + (intermediarySide.getStepZ() == -dz ? 1 : 0) == 2) {
 										intermediary = new Node(current, next.assignPathSide(intermediarySide));
 										break;
 									}
@@ -257,7 +258,7 @@ public class AdvancedPathFinder extends CustomPathFinder {
 		return end;
 	}
 
-	private DirectionalPathPoint ensureDirectional(PathPoint point) {
+	private DirectionalPathPoint ensureDirectional(net.minecraft.world.level.pathfinder.Node point) {
 		if(point instanceof DirectionalPathPoint) {
 			return (DirectionalPathPoint) point;
 		} else {

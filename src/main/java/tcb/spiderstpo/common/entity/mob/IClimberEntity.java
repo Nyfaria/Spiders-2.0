@@ -1,16 +1,14 @@
 package tcb.spiderstpo.common.entity.mob;
 
-import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
+import org.apache.commons.lang3.tuple.Pair;
+import tcb.spiderstpo.common.entity.movement.IAdvancedPathFindingEntity;
 
 import javax.annotation.Nullable;
-
-import org.apache.commons.lang3.tuple.Pair;
-
-import net.minecraft.block.BlockState;
-import net.minecraft.util.Direction;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.vector.Vector3d;
-import tcb.spiderstpo.common.entity.movement.IAdvancedPathFindingEntity;
+import java.util.List;
 
 public interface IClimberEntity extends IAdvancedPathFindingEntity {
 	public float getAttachmentOffset(Direction.Axis axis, float partialTicks);
@@ -28,12 +26,12 @@ public interface IClimberEntity extends IAdvancedPathFindingEntity {
 
 	public float getMovementSpeed();
 
-	public Pair<Direction, Vector3d> getGroundDirection();
+	public Pair<Direction, Vec3> getGroundDirection();
 
 	public boolean shouldTrackPathingTargets();
 	
 	@Nullable
-	public Vector3d getTrackedMovementTarget();
+	public Vec3 getTrackedMovementTarget();
 	
 	@Nullable
 	public List<PathingTarget> getTrackedPathingTargets();
@@ -62,5 +60,5 @@ public interface IClimberEntity extends IAdvancedPathFindingEntity {
 
 	public void setCollisionsSmoothingRange(float range);
 	
-	public void setJumpDirection(@Nullable Vector3d dir);
+	public void setJumpDirection(@Nullable Vec3 dir);
 }

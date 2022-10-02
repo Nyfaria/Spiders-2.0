@@ -1,9 +1,10 @@
 package tcb.spiderstpo.common;
 
-import net.minecraft.block.Block;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.BlockTags;
-import net.minecraft.tags.ITag;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.block.Block;
 
 public class ModTags {
-	public static final ITag<Block> NON_CLIMBABLE = BlockTags.makeWrapperTag("spiderstpo:non_climbable");
+	public static final TagKey<Block> NON_CLIMBABLE = BlockTags.create(new ResourceLocation("spiderstpo","non_climbable"));
 }

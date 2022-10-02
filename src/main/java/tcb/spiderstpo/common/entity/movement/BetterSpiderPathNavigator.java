@@ -1,54 +1,54 @@
 package tcb.spiderstpo.common.entity.movement;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.MobEntity;
-import net.minecraft.pathfinding.Path;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.pathfinder.Path;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
 import tcb.spiderstpo.common.entity.mob.IClimberEntity;
 
-public class BetterSpiderPathNavigator<T extends MobEntity & IClimberEntity> extends AdvancedClimberPathNavigator<T> {
+public class BetterSpiderPathNavigator<T extends Mob & IClimberEntity> extends AdvancedClimberPathNavigator<T> {
 	private boolean useVanillaBehaviour;
 	private BlockPos targetPosition;
 
-	public BetterSpiderPathNavigator(T entity, World worldIn, boolean useVanillaBehaviour) {
+	public BetterSpiderPathNavigator(T entity, Level worldIn, boolean useVanillaBehaviour) {
 		super(entity, worldIn, false, true, true);
 		this.useVanillaBehaviour = useVanillaBehaviour;
 	}
 
 	@Override
-	public Path getPathToPos(BlockPos pos, int p_179680_2_) {
+	public Path createPath(BlockPos pos, int p_179680_2_) {
 		this.targetPosition = pos;
-		return super.getPathToPos(pos, p_179680_2_);
+		return super.createPath(pos, p_179680_2_);
 	}
 
 	@Override
-	public Path getPathToEntity(Entity entityIn, int p_75494_2_) {
-		this.targetPosition = entityIn.func_233580_cy_();
-		return super.getPathToEntity(entityIn, p_75494_2_);
+	public Path createPath(Entity entityIn, int p_75494_2_) {
+		this.targetPosition = entityIn.blockPosition();
+		return super.createPath(entityIn, p_75494_2_);
 	}
 
 	@Override
-	public boolean tryMoveToEntityLiving(Entity entityIn, double speedIn) {
-		Path path = this.getPathToEntity(entityIn, 0);
+	public boolean moveTo(Entity entityIn, double speedIn) {
+		Path path = this.createPath(entityIn, 0);
 		if(path != null) {
-			return this.setPath(path, speedIn);
+			return this.moveTo(path, speedIn);
 		} else {
-			this.targetPosition = entityIn.func_233580_cy_();
-			this.speed = speedIn;
+			this.targetPosition = entityIn.blockPosition();
+			this.speedModifier = speedIn;
 			return true;
 		}
 	}
 
 	@Override
 	public void tick() {
-		if(!this.noPath()) {
+		if(!this.isDone()) {
 			super.tick();
 		} else {
 			if(this.targetPosition != null && this.useVanillaBehaviour) {
 				// FORGE: Fix MC-94054
-				if(!this.targetPosition.withinDistance(this.entity.getPositionVec(), Math.max((double) this.entity.getWidth(), 1.0D)) && (!(this.entity.getPosY() > (double) this.targetPosition.getY()) || !(new BlockPos((double) this.targetPosition.getX(), this.entity.getPosY(), (double) this.targetPosition.getZ())).withinDistance(this.entity.getPositionVec(), Math.max((double) this.entity.getWidth(), 1.0D)))) {
-					this.entity.getMoveHelper().setMoveTo((double) this.targetPosition.getX(), (double) this.targetPosition.getY(), (double) this.targetPosition.getZ(), this.speed);
+				if(!this.targetPosition.closerThan(this.mob.blockPosition(), Math.max((double) this.mob.getBbWidth(), 1.0D)) && (!(this.mob.getY() > (double) this.targetPosition.getY()) || !(new BlockPos((double) this.targetPosition.getX(), this.mob.getY(), (double) this.targetPosition.getZ())).closerThan(this.mob.blockPosition(), Math.max((double) this.mob.getBbWidth(), 1.0D)))) {
+					this.mob.getMoveControl().setWantedPosition((double) this.targetPosition.getX(), (double) this.targetPosition.getY(), (double) this.targetPosition.getZ(), this.speedModifier);
 				} else {
 					this.targetPosition = null;
 				}
