@@ -46,7 +46,7 @@ public abstract class BetterSpiderEntityMixin extends MonsterEntity implements I
 
 	@Inject(method = "<init>*", at = @At("RETURN"))
 	private void onConstructed(CallbackInfo ci) {
-		this.getAttribute(Attributes.field_233819_b_).func_233769_c_(FOLLOW_RANGE_INCREASE);
+		this.getAttribute(Attributes.FOLLOW_RANGE).addPermanentModifier(FOLLOW_RANGE_INCREASE);
 	}
 
 	@Inject(method = "registerData()V", at = @At("HEAD"))
@@ -75,16 +75,16 @@ public abstract class BetterSpiderEntityMixin extends MonsterEntity implements I
 
 	@Override	
 	public boolean canClimbOnBlock(BlockState state, BlockPos pos) {
-		return !state.getBlock().isIn(ModTags.NON_CLIMBABLE);
+		return !state.getBlock().is(ModTags.NON_CLIMBABLE);
 	}
 
 	@Override
 	public float getBlockSlipperiness(BlockPos pos) {
-		BlockState offsetState = this.world.getBlockState(pos);
+		BlockState offsetState = this.level.getBlockState(pos);
 
-		float slipperiness = offsetState.getBlock().getSlipperiness(offsetState, this.world, pos, this) * 0.91f;
+		float slipperiness = offsetState.getBlock().getSlipperiness(offsetState, this.level, pos, this) * 0.91f;
 
-		if(offsetState.getBlock().isIn(ModTags.NON_CLIMBABLE)) {
+		if(offsetState.getBlock().is(ModTags.NON_CLIMBABLE)) {
 			slipperiness = 1 - (1 - slipperiness) * 0.25f;
 		}
 
@@ -100,7 +100,7 @@ public abstract class BetterSpiderEntityMixin extends MonsterEntity implements I
 
 			for(Direction offset : Direction.values()) {
 				if(sides.test(offset)) {
-					offsetPos.setPos(pos.getX() + offset.getXOffset(), pos.getY() + offset.getYOffset(), pos.getZ() + offset.getZOffset());
+					offsetPos.set(pos.getX() + offset.getStepX(), pos.getY() + offset.getStepY(), pos.getZ() + offset.getStepZ());
 
 					BlockState state = cache.getBlockState(offsetPos);
 
@@ -115,6 +115,6 @@ public abstract class BetterSpiderEntityMixin extends MonsterEntity implements I
 			}
 		}
 
-		return entity.getPathPriority(nodeType);
+		return entity.getPathfindingMalus(nodeType);
 	}
 }
