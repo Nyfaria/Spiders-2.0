@@ -49,7 +49,7 @@ public abstract class BetterSpiderEntityMixin extends MonsterEntity implements I
 		this.getAttribute(Attributes.FOLLOW_RANGE).addPermanentModifier(FOLLOW_RANGE_INCREASE);
 	}
 
-	@Inject(method = "registerData()V", at = @At("HEAD"))
+	@Inject(method = "defineSynchedData", at = @At("HEAD"))
 	private void onRegisterData(CallbackInfo ci) {
 		this.pathFinderDebugPreview = Config.PATH_FINDER_DEBUG_PREVIEW.get();
 	}

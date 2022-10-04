@@ -14,7 +14,7 @@ import tcb.spiderstpo.common.entity.mob.IMobEntityTickHook;
 
 @Mixin(MobEntity.class)
 public abstract class MobEntityMixin implements IMobEntityLivingTickHook, IMobEntityTickHook, IMobEntityRegisterGoalsHook {
-	@Inject(method = "livingTick()V", at = @At("HEAD"))
+	@Inject(method = "aiStep", at = @At("HEAD"))
 	private void onLivingTick(CallbackInfo ci) {
 		this.onLivingTick();
 	}

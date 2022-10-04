@@ -55,12 +55,12 @@ public class AdvancedGroundPathNavigator<T extends MobEntity & IClimberEntity> e
 
 	@Override
 	protected final PathFinder createPathFinder(int maxExpansions) {
-		this.pathFinder = this.createPathFinder(maxExpansions);
+		this.pathFinder = this.createAdvancedPathFinder(maxExpansions);
 		this.nodeEvaluator = this.pathFinder.getNodeProcessor();
 		return this.pathFinder;
 	}
 
-	protected AdvancedPathFinder createPathFinder(int maxExpansions) {
+	protected AdvancedPathFinder createAdvancedPathFinder(int maxExpansions) {
 		AdvancedWalkNodeProcessor nodeProcessor = new AdvancedWalkNodeProcessor();
 		nodeProcessor.setCanPassDoors(true);
 		return new AdvancedPathFinder(nodeProcessor, maxExpansions);

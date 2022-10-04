@@ -36,7 +36,7 @@ public abstract class EntityMixin implements IEntityMovementHook, IEntityReadWri
 		return false;
 	}
 
-	@Inject(method = "getOnPosition()Lnet/minecraft/util/math/BlockPos;", at = @At("RETURN"), cancellable = true)
+	@Inject(method = "getOnPos", at = @At("RETURN"), cancellable = true)
 	private void onGetOnPosition(CallbackInfoReturnable<BlockPos> ci) {
 		BlockPos adjusted = this.getAdjustedOnPosition(ci.getReturnValue());
 		if(adjusted != null) {
@@ -49,19 +49,21 @@ public abstract class EntityMixin implements IEntityMovementHook, IEntityReadWri
 		return null;
 	}
 
-	@Inject(method = "canTriggerWalking()Z", at = @At("RETURN"), cancellable = true)
+	@Inject(method = "isMovementNoisy", at = @At("RETURN"), cancellable = true)
 	private void onCanTriggerWalking(CallbackInfoReturnable<Boolean> ci) {
 		ci.setReturnValue(this.getAdjustedCanTriggerWalking(ci.getReturnValue()));
 	}
+
+
 
 	@Override
 	public boolean getAdjustedCanTriggerWalking(boolean canTriggerWalking) {
 		return canTriggerWalking;
 	}
 
-	@Inject(method = "read(Lnet/minecraft/nbt/CompoundNBT;)V", at = @At(
+	@Inject(method = "load", at = @At(
 			value = "INVOKE",
-			target = "Lnet/minecraft/entity/Entity;readAdditional(Lnet/minecraft/nbt/CompoundNBT;)V",
+			target = "Lnet/minecraft/entity/Entity;readAdditionalSaveData(Lnet/minecraft/nbt/CompoundNBT;)V",
 			shift = At.Shift.AFTER
 			))
 	private void onRead(CompoundNBT nbt, CallbackInfo ci) {
@@ -71,9 +73,9 @@ public abstract class EntityMixin implements IEntityMovementHook, IEntityReadWri
 	@Override
 	public void onRead(CompoundNBT nbt) { }
 
-	@Inject(method = "writeWithoutTypeId(Lnet/minecraft/nbt/CompoundNBT;)Lnet/minecraft/nbt/CompoundNBT;", at = @At(
+	@Inject(method = "saveWithoutId", at = @At(
 			value = "INVOKE",
-			target = "Lnet/minecraft/entity/Entity;writeAdditional(Lnet/minecraft/nbt/CompoundNBT;)V",
+			target = "Lnet/minecraft/entity/Entity;addAdditionalSaveData(Lnet/minecraft/nbt/CompoundNBT;)V",
 			shift = At.Shift.AFTER
 			))
 	private void onWrite(CompoundNBT nbt, CallbackInfoReturnable<CompoundNBT> ci) {
@@ -84,14 +86,14 @@ public abstract class EntityMixin implements IEntityMovementHook, IEntityReadWri
 	public void onWrite(CompoundNBT nbt) { }
 
 	@Shadow(prefix = "shadow$")
-	private void shadow$registerData() { }
+	private void shadow$defineSynchedData() { }
 
 	@Redirect(method = "<init>*", at = @At(
 			value = "INVOKE",
-			target = "Lnet/minecraft/entity/Entity;registerData()V"
+			target = "Lnet/minecraft/entity/Entity;defineSynchedData()V"
 			))
 	private void onRegisterData(Entity _this) {
-		this.shadow$registerData();
+		this.shadow$defineSynchedData();
 		
 		if(_this == (Object) this) {
 			this.onRegisterData();
