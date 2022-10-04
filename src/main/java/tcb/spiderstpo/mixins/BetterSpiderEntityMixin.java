@@ -56,7 +56,7 @@ public abstract class BetterSpiderEntityMixin extends Monster implements IClimbe
 
 	@Redirect(method = "registerGoals()V", at = @At(
 			value = "INVOKE",
-			target = "Lnet/minecraft/entity/ai/goal/GoalSelector;addGoal(ILnet/minecraft/entity/ai/goal/Goal;)V"
+			target = "Lnet/minecraft/world/entity/ai/goal/GoalSelector;addGoal(ILnet/minecraft/world/entity/ai/goal/Goal;)V"
 			))
 	private void onAddGoal(GoalSelector selector, int priority, Goal task) {
 		if(task instanceof LeapAtTargetGoal) {
@@ -75,16 +75,16 @@ public abstract class BetterSpiderEntityMixin extends Monster implements IClimbe
 
 	@Override	
 	public boolean canClimbOnBlock(BlockState state, BlockPos pos) {
-		return !state.getBlock().is(ModTags.NON_CLIMBABLE);
+		return !state.is(ModTags.NON_CLIMBABLE);
 	}
 
 	@Override
 	public float getBlockSlipperiness(BlockPos pos) {
 		BlockState offsetState = this.level.getBlockState(pos);
 
-		float slipperiness = offsetState.getBlock().getSlipperiness(offsetState, this.level, pos, this) * 0.91f;
+		float slipperiness = offsetState.getBlock().getFriction(offsetState, this.level, pos, this) * 0.91f;
 
-		if(offsetState.getBlock().is(ModTags.NON_CLIMBABLE)) {
+		if(offsetState.is(ModTags.NON_CLIMBABLE)) {
 			slipperiness = 1 - (1 - slipperiness) * 0.25f;
 		}
 

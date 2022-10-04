@@ -19,14 +19,14 @@ import tcb.spiderstpo.common.entity.mob.IEntityRegisterDataHook;
 
 @Mixin(Entity.class)
 public abstract class EntityMixin implements IEntityMovementHook, IEntityReadWriteHook, IEntityRegisterDataHook {
-	@Inject(method = "move(Lnet/minecraft/entity/MoverType;Lnet/minecraft/util/math/vector/Vector3d;)V", at = @At("HEAD"), cancellable = true)
+	@Inject(method = "move", at = @At("HEAD"), cancellable = true)
 	private void onMovePre(MoverType type, Vec3 pos, CallbackInfo ci) {
 		if(this.onMove(type, pos, true)) {
 			ci.cancel();
 		}
 	}
 
-	@Inject(method = "move(Lnet/minecraft/entity/MoverType;Lnet/minecraft/util/math/vector/Vector3d;)V", at = @At("RETURN"))
+	@Inject(method = "move", at = @At("RETURN"))
 	private void onMovePost(MoverType type, Vec3 pos, CallbackInfo ci) {
 		this.onMove(type, pos, false);
 	}
@@ -49,11 +49,15 @@ public abstract class EntityMixin implements IEntityMovementHook, IEntityReadWri
 		return null;
 	}
 
-	@Inject(method = "isMovementNoisy", at = @At("RETURN"), cancellable = true)
-	private void onCanTriggerWalking(CallbackInfoReturnable<Boolean> ci) {
-		ci.setReturnValue(this.getAdjustedCanTriggerWalking(ci.getReturnValue()));
+	//todo: figure out if this change is correct;
+//	@Inject(method = "isMovementNoisy", at = @At("RETURN"), cancellable = true)
+//	private void onCanTriggerWalking(CallbackInfoReturnable<Boolean> ci) {
+//		ci.setReturnValue(this.getAdjustedCanTriggerWalking(ci.getReturnValue()));
+//	}
+	@Redirect(method = "move", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity$MovementEmission;emitsAnything()Z"))
+	public boolean bop(Entity.MovementEmission instance){
+		return this.getAdjustedCanTriggerWalking(instance.emitsAnything());
 	}
-
 
 
 	@Override
@@ -63,7 +67,7 @@ public abstract class EntityMixin implements IEntityMovementHook, IEntityReadWri
 
 	@Inject(method = "load", at = @At(
 			value = "INVOKE",
-			target = "Lnet/minecraft/entity/Entity;readAdditionalSaveData(Lnet/minecraft/nbt/CompoundNBT;)V",
+			target = "Lnet/minecraft/world/entity/Entity;readAdditionalSaveData(Lnet/minecraft/nbt/CompoundTag;)V",
 			shift = At.Shift.AFTER
 			))
 	private void onRead(CompoundTag nbt, CallbackInfo ci) {
@@ -75,7 +79,7 @@ public abstract class EntityMixin implements IEntityMovementHook, IEntityReadWri
 
 	@Inject(method = "saveWithoutId", at = @At(
 			value = "INVOKE",
-			target = "Lnet/minecraft/entity/Entity;addAdditionalSaveData(Lnet/minecraft/nbt/CompoundNBT;)V",
+			target = "Lnet/minecraft/world/entity/Entity;addAdditionalSaveData(Lnet/minecraft/nbt/CompoundTag;)V",
 			shift = At.Shift.AFTER
 			))
 	private void onWrite(CompoundTag nbt, CallbackInfoReturnable<CompoundTag> ci) {
@@ -90,7 +94,7 @@ public abstract class EntityMixin implements IEntityMovementHook, IEntityReadWri
 
 	@Redirect(method = "<init>*", at = @At(
 			value = "INVOKE",
-			target = "Lnet/minecraft/entity/Entity;defineSynchedData()V"
+			target = "Lnet/minecraft/world/entity/Entity;defineSynchedData()V"
 			))
 	private void onRegisterData(Entity _this) {
 		this.shadow$defineSynchedData();

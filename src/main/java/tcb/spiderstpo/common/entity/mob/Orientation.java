@@ -41,7 +41,7 @@ public class Orientation {
 		Vec3 local = this.getLocal(global);
 
 		float yaw = (float) Math.toDegrees(Mth.atan2(local.x, local.z)) + 180.0f;
-		float pitch = (float) -Math.toDegrees(Mth.atan2(local.y, Mth.sqrt(local.x * local.x + local.z * local.z)));
+		float pitch = (float) -Math.toDegrees(Mth.atan2(local.y, Math.sqrt(local.x * local.x + local.z * local.z)));
 
 		return Pair.of(yaw, pitch);
 	}

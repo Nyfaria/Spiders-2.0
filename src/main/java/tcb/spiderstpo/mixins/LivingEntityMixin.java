@@ -18,7 +18,7 @@ import tcb.spiderstpo.common.entity.mob.ILivingEntityTravelHook;
 
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityMixin implements ILivingEntityLookAtHook, ILivingEntityDataManagerHook, ILivingEntityTravelHook, ILivingEntityJumpHook {
-	@ModifyVariable(method = "lookAt(Lnet/minecraft/command/arguments/EntityAnchorArgument$Type;Lnet/minecraft/util/math/vector/Vector3d;)V", at = @At("HEAD"), ordinal = 0)
+	@ModifyVariable(method = "lookAt", at = @At("HEAD"), ordinal = 0)
 	private Vec3 onLookAtModify(Vec3 vec, EntityAnchorArgument.Anchor anchor, Vec3 vec2) {
 		return this.onLookAt(anchor, vec);
 	}
@@ -36,14 +36,14 @@ public abstract class LivingEntityMixin implements ILivingEntityLookAtHook, ILiv
 	@Override
 	public void onNotifyDataManagerChange(EntityDataAccessor<?> key) { }
 
-	@Inject(method = "travel(Lnet/minecraft/util/math/vector/Vector3d;)V", at = @At("HEAD"), cancellable = true)
+	@Inject(method = "travel", at = @At("HEAD"), cancellable = true)
 	private void onTravelPre(Vec3 relative, CallbackInfo ci) {
 		if(this.onTravel(relative, true)) {
 			ci.cancel();
 		}
 	}
 
-	@Inject(method = "travel(Lnet/minecraft/util/math/vector/Vector3d;)V", at = @At("RETURN"))
+	@Inject(method = "travel", at = @At("RETURN"))
 	private void onTravelPost(Vec3 relative, CallbackInfo ci) {
 		this.onTravel(relative, false);
 	}

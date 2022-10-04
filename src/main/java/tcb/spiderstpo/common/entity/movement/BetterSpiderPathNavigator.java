@@ -47,7 +47,7 @@ public class BetterSpiderPathNavigator<T extends Mob & IClimberEntity> extends A
 		} else {
 			if(this.targetPosition != null && this.useVanillaBehaviour) {
 				// FORGE: Fix MC-94054
-				if(!this.targetPosition.closerThan(this.mob.position(), Math.max((double) this.mob.getBbWidth(), 1.0D)) && (!(this.mob.getY() > (double) this.targetPosition.getY()) || !(new BlockPos((double) this.targetPosition.getX(), this.mob.getY(), (double) this.targetPosition.getZ())).closerThan(this.mob.position(), Math.max((double) this.mob.getBbWidth(), 1.0D)))) {
+				if(!this.targetPosition.closerThan(this.mob.blockPosition(), Math.max((double) this.mob.getBbWidth(), 1.0D)) && (!(this.mob.getY() > (double) this.targetPosition.getY()) || !(new BlockPos((double) this.targetPosition.getX(), this.mob.getY(), (double) this.targetPosition.getZ())).closerThan(this.mob.blockPosition(), Math.max((double) this.mob.getBbWidth(), 1.0D)))) {
 					this.mob.getMoveControl().setWantedPosition((double) this.targetPosition.getX(), (double) this.targetPosition.getY(), (double) this.targetPosition.getZ(), this.speedModifier);
 				} else {
 					this.targetPosition = null;

@@ -216,7 +216,7 @@ public class AdvancedClimberPathNavigator<T extends Mob & IClimberEntity> extend
 			}
 
 			for(int i = firstDifferentHeightPoint - 1; i >= this.path.getNextNodeIndex(); --i) {
-				if(this.canMoveDirectly(pos, this.path.getEntityPosAtNode(this.mob, i), sizeX, sizeY, sizeZ)) {
+				if(this.canMoveDirectly(pos, this.path.getEntityPosAtNode(this.mob, i)/*, sizeX, sizeY, sizeZ*/)) {
 					this.path.setNextNodeIndex(i);
 					break;
 				}
@@ -274,8 +274,12 @@ public class AdvancedClimberPathNavigator<T extends Mob & IClimberEntity> extend
 		}
 	}
 
+	//todo: fix this?
 	@Override
-	protected boolean canMoveDirectly(Vec3 start, Vec3 end, int sizeX, int sizeY, int sizeZ) {
+	protected boolean canMoveDirectly(Vec3 start, Vec3 end/*, int sizeX, int sizeY, int sizeZ*/) {
+		int sizeX = 0;//(int) this.mob.getBbWidth();
+		int sizeY = 0;//(int) this.mob.getBbHeight();
+		int sizeZ = 0;//(int) this.mob.getBbWidth();
 		switch(this.verticalFacing.getAxis()) {
 		case X:
 			return this.isDirectPathBetweenPoints(start, end, sizeX, sizeY, sizeZ, Direction.Axis.Z, Direction.Axis.X, Direction.Axis.Y, 0.0D, this.verticalFacing.getStepX() < 0);

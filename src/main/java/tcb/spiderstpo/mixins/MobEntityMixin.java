@@ -35,7 +35,7 @@ public abstract class MobEntityMixin implements IMobEntityLivingTickHook, IMobEn
 
 	@Redirect(method = "<init>*", at = @At(
 			value = "INVOKE",
-			target = "Lnet/minecraft/entity/MobEntity;registerGoals()V"
+			target = "Lnet/minecraft/world/entity/Mob;registerGoals()V"
 			))
 	private void onRegisterGoals(Mob _this) {
 		this.shadow$registerGoals();

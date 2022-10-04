@@ -140,7 +140,7 @@ public class AdvancedWalkNodeProcessor extends WalkNodeEvaluator {
 
 		BlockState state = this.level.getBlockState(checkPos.set(x, by, z));
 
-		if(!this.mob.canStandOnFluid(state.getFluidState().getType())) {
+		if(!this.mob.canStandOnFluid(state.getFluidState())) {
 			if(this.canFloat() && this.mob.isInWater()) {
 				while(true) {
 					if(state.getBlock() != Blocks.WATER && state.getFluidState() != Fluids.WATER.getSource(false)) {
@@ -160,7 +160,7 @@ public class AdvancedWalkNodeProcessor extends WalkNodeEvaluator {
 				by = blockpos.above().getY();
 			}
 		} else {
-			while(this.mob.canStandOnFluid(state.getFluidState().getType())) {
+			while(this.mob.canStandOnFluid(state.getFluidState())) {
 				++by;
 				state = this.level.getBlockState(checkPos.set(x, by, z));
 			}

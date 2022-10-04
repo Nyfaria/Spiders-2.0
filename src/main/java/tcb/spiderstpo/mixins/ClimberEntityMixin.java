@@ -1,61 +1,47 @@
 package tcb.spiderstpo.mixins;
 
-import java.lang.invoke.MethodHandles;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.function.Predicate;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
-
-import javax.annotation.Nullable;
-
+import com.google.common.collect.ImmutableList;
+import net.minecraft.commands.arguments.EntityAnchorArgument.Anchor;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Rotations;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ChunkMap.TrackedEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.monster.Spider;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.CollisionGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.border.WorldBorder;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.pathfinder.Node;
+import net.minecraft.world.level.pathfinder.Path;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import org.apache.commons.lang3.tuple.Pair;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-
-import com.google.common.collect.ImmutableList;
-
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.commands.arguments.EntityAnchorArgument.Anchor;
-import net.minecraft.world.entity.PathfinderMob;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.MoverType;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier;
-import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.ai.attributes.AttributeInstance;
-import net.minecraft.world.entity.monster.Spider;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.syncher.EntityDataAccessor;
-import net.minecraft.network.syncher.EntityDataSerializers;
-import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.world.level.pathfinder.Path;
-import net.minecraft.world.entity.ai.navigation.PathNavigation;
-import net.minecraft.world.level.pathfinder.Node;
-import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.core.Direction;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.Mth;
-import net.minecraft.core.Rotations;
-import net.minecraft.world.phys.shapes.VoxelShape;
-import net.minecraft.world.level.CollisionSpliterator;
-import net.minecraft.world.phys.shapes.Shapes;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.CollisionGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.border.WorldBorder;
-import net.minecraft.server.level.ChunkMap.TrackedEntity;
-import net.minecraft.server.level.ServerLevel;
 import tcb.spiderstpo.common.CollisionSmoothingUtil;
 import tcb.spiderstpo.common.Matrix4f;
 import tcb.spiderstpo.common.entity.mob.IClimberEntity;
@@ -76,6 +62,13 @@ import tcb.spiderstpo.common.entity.movement.ClimberJumpController;
 import tcb.spiderstpo.common.entity.movement.ClimberLookController;
 import tcb.spiderstpo.common.entity.movement.ClimberMoveController;
 import tcb.spiderstpo.common.entity.movement.DirectionalPathPoint;
+
+import javax.annotation.Nullable;
+import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @Mixin(value = { Spider.class })
 public abstract class ClimberEntityMixin extends PathfinderMob implements IClimberEntity, IMobEntityLivingTickHook, ILivingEntityLookAtHook, IMobEntityTickHook, ILivingEntityRotationHook, ILivingEntityDataManagerHook, ILivingEntityTravelHook, IEntityMovementHook, IEntityReadWriteHook, IEntityRegisterDataHook, ILivingEntityJumpHook {
@@ -451,7 +444,7 @@ public abstract class ClimberEntityMixin extends PathfinderMob implements IClimb
 			if(entityTracker != null && entityTracker.serverEntity.tickCount % entityTracker.serverEntity.updateInterval == 0) {
 				Orientation orientation = this.getOrientation();
 
-				Vec3 look = orientation.getGlobal(this.yRot, this.xRot);
+				Vec3 look = orientation.getGlobal(this.getYRot(), this.getXRot());
 				this.entityData.set(ROTATION_BODY, new Rotations((float) look.x, (float) look.y, (float) look.z));
 
 				look = orientation.getGlobal(this.yHeadRot, 0.0f);
@@ -459,8 +452,8 @@ public abstract class ClimberEntityMixin extends PathfinderMob implements IClimb
 
 				if(this.shouldTrackPathingTargets()) {
 					if(this.xxa != 0) {
-						Vec3 forwardVector = orientation.getGlobal(this.yRot, 0);
-						Vec3 strafeVector = orientation.getGlobal(this.yRot + 90.0f, 0);
+						Vec3 forwardVector = orientation.getGlobal(this.getYRot(), 0);
+						Vec3 strafeVector = orientation.getGlobal(this.getYRot() + 90.0f, 0);
 
 						Vec3 offset = forwardVector.scale(this.zza).add(strafeVector.scale(this.xxa)).normalize();
 
@@ -585,6 +578,16 @@ public abstract class ClimberEntityMixin extends PathfinderMob implements IClimb
 
 		CollisionGetter cachedCollisionReader = new CollisionGetter() {
 			@Override
+			public int getHeight() {
+				return level.getHeight();
+			}
+
+			@Override
+			public int getMinBuildHeight() {
+				return level.getMinBuildHeight();
+			}
+
+			@Override
 			public BlockEntity getBlockEntity(BlockPos pos) {
 				return collisionReader.getBlockEntity(pos);
 			}
@@ -604,9 +607,11 @@ public abstract class ClimberEntityMixin extends PathfinderMob implements IClimb
 				return collisionReader.getWorldBorder();
 			}
 
+
+
 			@Override
-			public Stream<VoxelShape> getEntityCollisions(Entity entity, AABB aabb, Predicate<Entity> predicate) {
-				return collisionReader.getEntityCollisions(entity, aabb, predicate);
+			public List<VoxelShape> getEntityCollisions(Entity entity, AABB aabb) {
+				return collisionReader.getEntityCollisions(entity, aabb);
 			}
 
 			@Override
@@ -615,7 +620,9 @@ public abstract class ClimberEntityMixin extends PathfinderMob implements IClimb
 			}
 		};
 
-		Stream<VoxelShape> shapes = StreamSupport.stream(new CollisionSpliterator(cachedCollisionReader, this, aabb, this::canClimbOnBlock), false);
+		//todo:figure out;
+		Iterable<VoxelShape> shapes =  cachedCollisionReader.getBlockCollisions(this,aabb);
+//		StreamSupport.stream(new CollisionSpliterator(cachedCollisionReader, this, aabb, this::canClimbOnBlock), false);
 
 		shapes.forEach(shape -> shape.forAllBoxes(action));
 	}
@@ -634,11 +641,11 @@ public abstract class ClimberEntityMixin extends PathfinderMob implements IClimb
 	@Override
 	public float getBlockSlipperiness(BlockPos pos) {
 		BlockState offsetState = this.level.getBlockState(pos);
-		return offsetState.getBlock().getSlipperiness(offsetState, this.level, pos, this) * 0.91f;
+		return offsetState.getBlock().getFriction(offsetState, this.level, pos, this) * 0.91f;
 	}
 
 	private void updateOffsetsAndOrientation() {
-		Vec3 direction = this.getOrientation().getGlobal(this.yRot, this.xRot);
+		Vec3 direction = this.getOrientation().getGlobal(this.getYRot(), this.getXRot());
 
 		boolean isAttached = false;
 
@@ -697,8 +704,8 @@ public abstract class ClimberEntityMixin extends PathfinderMob implements IClimb
 
 		Pair<Float, Float> newRotations = this.getOrientation().getLocalRotation(direction);
 
-		float yawDelta = newRotations.getLeft() - this.yRot;
-		float pitchDelta = newRotations.getRight() - this.xRot;
+		float yawDelta = newRotations.getLeft() - this.getYRot();
+		float pitchDelta = newRotations.getRight() - this.getXRot();
 
 		this.prevOrientationYawDelta = this.orientationYawDelta;
 		this.orientationYawDelta = yawDelta;
@@ -874,13 +881,13 @@ public abstract class ClimberEntityMixin extends PathfinderMob implements IClimb
 
 			FluidState fluidState = this.level.getFluidState(this.blockPosition());
 
-			if(!this.canClimbInWater && this.isInWater() && this.isAffectedByFluids() && !this.canStandOnFluid(fluidState.getType())) {
+			if(!this.canClimbInWater && this.isInWater() && this.isAffectedByFluids() && !this.canStandOnFluid(fluidState)) {
 				this.isTravelingInFluid = true;
 
 				if(canTravel) {
 					return false;
 				}
-			} else if(!this.canClimbInLava && this.isInLava() && this.isAffectedByFluids() && !this.canStandOnFluid(fluidState.getType())) {
+			} else if(!this.canClimbInLava && this.isInLava() && this.isAffectedByFluids() && !this.canStandOnFluid(fluidState)) {
 				this.isTravelingInFluid = true;
 
 				if(canTravel) {
@@ -1122,9 +1129,9 @@ public abstract class ClimberEntityMixin extends PathfinderMob implements IClimb
 
 			this.walkDist = (float) ((double) this.walkDist + tangentialMovement.length() * 0.6D);
 
-			this.moveDist = (float) ((double) this.moveDist + (double) Mth.sqrt(dx * dx + dy * dy + dz * dz) * 0.6D);
+			this.moveDist = (float) ((double) this.moveDist + Math.sqrt(dx * dx + dy * dy + dz * dz) * 0.6D);
 
-			if(this.moveDist > this.nextStepDistance && !state.isAir(this.level, pos)) {
+			if(this.moveDist > this.nextStepDistance && !state.isAir()) {
 				this.nextStepDistance = this.nextStep();
 
 				if(this.isInWater()) {
@@ -1134,7 +1141,7 @@ public abstract class ClimberEntityMixin extends PathfinderMob implements IClimb
 
 					Vec3 motion = controller.getDeltaMovement();
 
-					float swimStrength = Mth.sqrt(motion.x * motion.x * (double) 0.2F + motion.y * motion.y + motion.z * motion.z * 0.2F) * multiplier;
+					float swimStrength = (float)Math.sqrt(motion.x * motion.x * (double) 0.2F + motion.y * motion.y + motion.z * motion.z * 0.2F) * multiplier;
 					if(swimStrength > 1.0F) {
 						swimStrength = 1.0F;
 					}
@@ -1143,8 +1150,8 @@ public abstract class ClimberEntityMixin extends PathfinderMob implements IClimb
 				} else {
 					this.playStepSound(pos, state);
 				}
-			} else if(this.moveDist > this.nextFlap && this.makeFlySound() && state.isAir(this.level, pos)) {
-				this.nextFlap = this.playFlySound(this.moveDist);
+			} else if(state.isAir()) {
+				this.processFlappingMovement();
 			}
 		}
 
@@ -1154,5 +1161,10 @@ public abstract class ClimberEntityMixin extends PathfinderMob implements IClimb
 	@Override
 	public boolean canClimberTriggerWalking() {
 		return true;
+	}
+
+	public void setLocationFromBoundingbox() {
+		AABB axisalignedbb = this.getBoundingBox();
+		this.setPosRaw((axisalignedbb.minX + axisalignedbb.maxX) / 2.0D, axisalignedbb.minY, (axisalignedbb.minZ + axisalignedbb.maxZ) / 2.0D);
 	}
 }

@@ -31,8 +31,8 @@ public class ClientEventHandlers {
 		if(entity instanceof IClimberEntity) {
 			IClimberEntity climber = (IClimberEntity) entity;
 
-			float partialTicks = event.getPartialRenderTick();
-			PoseStack matrixStack = event.getMatrixStack();
+			float partialTicks = event.getPartialTick();
+			PoseStack matrixStack = event.getPoseStack();
 
 			Orientation orientation = climber.getOrientation();
 			Orientation renderOrientation = climber.calculateOrientation(partialTicks);
@@ -59,9 +59,9 @@ public class ClientEventHandlers {
 		if(entity instanceof IClimberEntity) {
 			IClimberEntity climber = (IClimberEntity) entity;
 
-			float partialTicks = event.getPartialRenderTick();
-			PoseStack matrixStack = event.getMatrixStack();
-			MultiBufferSource bufferIn = event.getBuffers();
+			float partialTicks = event.getPartialTick();
+			PoseStack matrixStack = event.getPoseStack();
+			MultiBufferSource bufferIn = event.getMultiBufferSource();
 
 			Orientation orientation = climber.getOrientation();
 			Orientation renderOrientation = climber.getRenderOrientation();
