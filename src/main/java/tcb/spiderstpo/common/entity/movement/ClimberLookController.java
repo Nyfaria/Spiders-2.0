@@ -1,11 +1,11 @@
 package tcb.spiderstpo.common.entity.movement;
 
-import net.minecraft.entity.MobEntity;
-import net.minecraft.entity.ai.controller.LookController;
-import net.minecraft.util.math.vector.Vector3d;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.control.LookControl;
+import net.minecraft.world.phys.Vec3;
 import tcb.spiderstpo.common.entity.mob.IClimberEntity;
 
-public class ClimberLookController<T extends MobEntity & IClimberEntity> extends LookController {
+public class ClimberLookController<T extends Mob & IClimberEntity> extends LookControl {
 	protected final IClimberEntity climber;
 
 	public ClimberLookController(T entity) {
@@ -15,13 +15,13 @@ public class ClimberLookController<T extends MobEntity & IClimberEntity> extends
 
 	@Override
 	protected float getXRotD() {
-		Vector3d dir = new Vector3d(this.wantedX - this.mob.getX(), this.wantedY - this.mob.getEyeY(), this.wantedZ - this.mob.getZ());
+		Vec3 dir = new Vec3(this.wantedX - this.mob.getX(), this.wantedY - this.mob.getEyeY(), this.wantedZ - this.mob.getZ());
 		return this.climber.getOrientation().getLocalRotation(dir).getRight();
 	}
 
 	@Override
 	protected float getYRotD() {
-		Vector3d dir = new Vector3d(this.wantedX - this.mob.getX(), this.wantedY - this.mob.getEyeY(), this.wantedZ - this.mob.getZ());
+		Vec3 dir = new Vec3(this.wantedX - this.mob.getX(), this.wantedY - this.mob.getEyeY(), this.wantedZ - this.mob.getZ());
 		return this.climber.getOrientation().getLocalRotation(dir).getLeft();
 	}
 }

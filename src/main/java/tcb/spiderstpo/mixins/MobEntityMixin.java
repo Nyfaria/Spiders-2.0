@@ -7,12 +7,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.entity.MobEntity;
+import net.minecraft.world.entity.Mob;
 import tcb.spiderstpo.common.entity.mob.IMobEntityLivingTickHook;
 import tcb.spiderstpo.common.entity.mob.IMobEntityRegisterGoalsHook;
 import tcb.spiderstpo.common.entity.mob.IMobEntityTickHook;
 
-@Mixin(MobEntity.class)
+@Mixin(Mob.class)
 public abstract class MobEntityMixin implements IMobEntityLivingTickHook, IMobEntityTickHook, IMobEntityRegisterGoalsHook {
 	@Inject(method = "aiStep", at = @At("HEAD"))
 	private void onLivingTick(CallbackInfo ci) {
@@ -37,7 +37,7 @@ public abstract class MobEntityMixin implements IMobEntityLivingTickHook, IMobEn
 			value = "INVOKE",
 			target = "Lnet/minecraft/entity/MobEntity;registerGoals()V"
 			))
-	private void onRegisterGoals(MobEntity _this) {
+	private void onRegisterGoals(Mob _this) {
 		this.shadow$registerGoals();
 
 		if(_this == (Object) this) {

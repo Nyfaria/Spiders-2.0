@@ -10,12 +10,12 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
-import net.minecraft.pathfinding.NodeProcessor;
-import net.minecraft.pathfinding.Path;
-import net.minecraft.pathfinding.PathNodeType;
-import net.minecraft.pathfinding.PathPoint;
-import net.minecraft.util.Direction;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.pathfinder.NodeEvaluator;
+import net.minecraft.world.level.pathfinder.Path;
+import net.minecraft.world.level.pathfinder.BlockPathTypes;
+import net.minecraft.world.level.pathfinder.Node;
+import net.minecraft.core.Direction;
+import net.minecraft.core.BlockPos;
 
 public class AdvancedPathFinder extends CustomPathFinder {
 	private static class TPONode {
@@ -75,13 +75,13 @@ public class AdvancedPathFinder extends CustomPathFinder {
 
 	private static final Direction[] DOWN = new Direction[] { Direction.DOWN };
 
-	public AdvancedPathFinder(NodeProcessor processor, int maxExpansions) {
+	public AdvancedPathFinder(NodeEvaluator processor, int maxExpansions) {
 		super(processor, maxExpansions);
 	}
 
 	@Override
-	protected Path createPath(PathPoint _targetPoint, BlockPos target, boolean isTargetReached) {
-		List<PathPoint> points = new ArrayList<>();
+	protected Path createPath(Node _targetPoint, BlockPos target, boolean isTargetReached) {
+		List<Node> points = new ArrayList<>();
 
 		//Backtrack path from target point back to entity
 		this.backtrackPath(points, _targetPoint);
@@ -101,8 +101,8 @@ public class AdvancedPathFinder extends CustomPathFinder {
 		return new Path(points, target, isTargetReached);
 	}
 
-	private void backtrackPath(List<PathPoint> points, PathPoint start) {
-		PathPoint currentPathPoint = start;
+	private void backtrackPath(List<Node> points, Node start) {
+		Node currentPathPoint = start;
 		points.add(start);
 
 		while(currentPathPoint.cameFrom != null) {
@@ -111,7 +111,7 @@ public class AdvancedPathFinder extends CustomPathFinder {
 		}
 	}
 
-	private void backtrackPath(List<PathPoint> points, TPONode start) {
+	private void backtrackPath(List<Node> points, TPONode start) {
 		TPONode currentTPONode = start;
 		points.add(start.pathPoint);
 
@@ -130,10 +130,10 @@ public class AdvancedPathFinder extends CustomPathFinder {
 	}
 
 	private static boolean isOmnidirectionalPoint(DirectionalPathPoint point) {
-		return point.type == PathNodeType.WATER || point.type == PathNodeType.LAVA;
+		return point.type == BlockPathTypes.WATER || point.type == BlockPathTypes.LAVA;
 	}
 
-	private TPONode retraceSidedPath(List<PathPoint> points, boolean isReversed) {
+	private TPONode retraceSidedPath(List<Node> points, boolean isReversed) {
 		if(points.isEmpty()) {
 			return null;
 		}
@@ -257,7 +257,7 @@ public class AdvancedPathFinder extends CustomPathFinder {
 		return end;
 	}
 
-	private DirectionalPathPoint ensureDirectional(PathPoint point) {
+	private DirectionalPathPoint ensureDirectional(Node point) {
 		if(point instanceof DirectionalPathPoint) {
 			return (DirectionalPathPoint) point;
 		} else {

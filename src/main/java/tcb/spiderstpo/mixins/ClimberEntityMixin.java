@@ -20,42 +20,42 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.google.common.collect.ImmutableList;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.command.arguments.EntityAnchorArgument.Type;
-import net.minecraft.entity.CreatureEntity;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.MobEntity;
-import net.minecraft.entity.MoverType;
-import net.minecraft.entity.ai.attributes.AttributeModifier;
-import net.minecraft.entity.ai.attributes.Attributes;
-import net.minecraft.entity.ai.attributes.ModifiableAttributeInstance;
-import net.minecraft.entity.monster.SpiderEntity;
-import net.minecraft.fluid.FluidState;
-import net.minecraft.nbt.CompoundNBT;
-import net.minecraft.network.datasync.DataParameter;
-import net.minecraft.network.datasync.DataSerializers;
-import net.minecraft.network.datasync.EntityDataManager;
-import net.minecraft.pathfinding.Path;
-import net.minecraft.pathfinding.PathNavigator;
-import net.minecraft.pathfinding.PathPoint;
-import net.minecraft.potion.Effects;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.Direction;
-import net.minecraft.util.math.AxisAlignedBB;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Rotations;
-import net.minecraft.util.math.shapes.VoxelShape;
-import net.minecraft.util.math.shapes.VoxelShapeSpliterator;
-import net.minecraft.util.math.shapes.VoxelShapes;
-import net.minecraft.util.math.vector.Vector3d;
-import net.minecraft.world.IBlockReader;
-import net.minecraft.world.ICollisionReader;
-import net.minecraft.world.World;
-import net.minecraft.world.border.WorldBorder;
-import net.minecraft.world.server.ChunkManager.EntityTracker;
-import net.minecraft.world.server.ServerWorld;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.commands.arguments.EntityAnchorArgument.Anchor;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.monster.Spider;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.world.level.pathfinder.Path;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.level.pathfinder.Node;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
+import net.minecraft.core.Rotations;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.world.level.CollisionSpliterator;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.CollisionGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.border.WorldBorder;
+import net.minecraft.server.level.ChunkMap.TrackedEntity;
+import net.minecraft.server.level.ServerLevel;
 import tcb.spiderstpo.common.CollisionSmoothingUtil;
 import tcb.spiderstpo.common.Matrix4f;
 import tcb.spiderstpo.common.entity.mob.IClimberEntity;
@@ -77,59 +77,59 @@ import tcb.spiderstpo.common.entity.movement.ClimberLookController;
 import tcb.spiderstpo.common.entity.movement.ClimberMoveController;
 import tcb.spiderstpo.common.entity.movement.DirectionalPathPoint;
 
-@Mixin(value = { SpiderEntity.class })
-public abstract class ClimberEntityMixin extends CreatureEntity implements IClimberEntity, IMobEntityLivingTickHook, ILivingEntityLookAtHook, IMobEntityTickHook, ILivingEntityRotationHook, ILivingEntityDataManagerHook, ILivingEntityTravelHook, IEntityMovementHook, IEntityReadWriteHook, IEntityRegisterDataHook, ILivingEntityJumpHook {
+@Mixin(value = { Spider.class })
+public abstract class ClimberEntityMixin extends PathfinderMob implements IClimberEntity, IMobEntityLivingTickHook, ILivingEntityLookAtHook, IMobEntityTickHook, ILivingEntityRotationHook, ILivingEntityDataManagerHook, ILivingEntityTravelHook, IEntityMovementHook, IEntityReadWriteHook, IEntityRegisterDataHook, ILivingEntityJumpHook {
 
 	//Copy from LivingEntity
 	private static final UUID SLOW_FALLING_ID = UUID.fromString("A5B6CF2A-2F7C-31EF-9022-7C3E7D5E6ABA");
 	private static final AttributeModifier SLOW_FALLING = new AttributeModifier(SLOW_FALLING_ID, "Slow falling acceleration reduction", -0.07, AttributeModifier.Operation.ADDITION);
 
-	private static final DataParameter<Float> MOVEMENT_TARGET_X;
-	private static final DataParameter<Float> MOVEMENT_TARGET_Y;
-	private static final DataParameter<Float> MOVEMENT_TARGET_Z;
-	private static final ImmutableList<DataParameter<Optional<BlockPos>>> PATHING_TARGETS;
-	private static final ImmutableList<DataParameter<Direction>> PATHING_SIDES;
+	private static final EntityDataAccessor<Float> MOVEMENT_TARGET_X;
+	private static final EntityDataAccessor<Float> MOVEMENT_TARGET_Y;
+	private static final EntityDataAccessor<Float> MOVEMENT_TARGET_Z;
+	private static final ImmutableList<EntityDataAccessor<Optional<BlockPos>>> PATHING_TARGETS;
+	private static final ImmutableList<EntityDataAccessor<Direction>> PATHING_SIDES;
 
-	private static final DataParameter<Rotations> ROTATION_BODY;
-	private static final DataParameter<Rotations> ROTATION_HEAD;
+	private static final EntityDataAccessor<Rotations> ROTATION_BODY;
+	private static final EntityDataAccessor<Rotations> ROTATION_HEAD;
 
 	static {
 		@SuppressWarnings("unchecked")
 		Class<Entity> cls = (Class<Entity>) MethodHandles.lookup().lookupClass();
 
-		MOVEMENT_TARGET_X = EntityDataManager.defineId(cls, DataSerializers.FLOAT);
-		MOVEMENT_TARGET_Y = EntityDataManager.defineId(cls, DataSerializers.FLOAT);
-		MOVEMENT_TARGET_Z = EntityDataManager.defineId(cls, DataSerializers.FLOAT);
+		MOVEMENT_TARGET_X = SynchedEntityData.defineId(cls, EntityDataSerializers.FLOAT);
+		MOVEMENT_TARGET_Y = SynchedEntityData.defineId(cls, EntityDataSerializers.FLOAT);
+		MOVEMENT_TARGET_Z = SynchedEntityData.defineId(cls, EntityDataSerializers.FLOAT);
 
-		ImmutableList.Builder<DataParameter<Optional<BlockPos>>> pathingTargets = ImmutableList.builder();
-		ImmutableList.Builder<DataParameter<Direction>> pathingSides = ImmutableList.builder();
+		ImmutableList.Builder<EntityDataAccessor<Optional<BlockPos>>> pathingTargets = ImmutableList.builder();
+		ImmutableList.Builder<EntityDataAccessor<Direction>> pathingSides = ImmutableList.builder();
 		for(int i = 0; i < 8; i++) {
-			pathingTargets.add(EntityDataManager.defineId(cls, DataSerializers.OPTIONAL_BLOCK_POS));
-			pathingSides.add(EntityDataManager.defineId(cls, DataSerializers.DIRECTION));
+			pathingTargets.add(SynchedEntityData.defineId(cls, EntityDataSerializers.OPTIONAL_BLOCK_POS));
+			pathingSides.add(SynchedEntityData.defineId(cls, EntityDataSerializers.DIRECTION));
 		}
 		PATHING_TARGETS = pathingTargets.build();
 		PATHING_SIDES = pathingSides.build();
 
-		ROTATION_BODY = EntityDataManager.defineId(cls, DataSerializers.ROTATIONS);
-		ROTATION_HEAD = EntityDataManager.defineId(cls, DataSerializers.ROTATIONS);
+		ROTATION_BODY = SynchedEntityData.defineId(cls, EntityDataSerializers.ROTATIONS);
+		ROTATION_HEAD = SynchedEntityData.defineId(cls, EntityDataSerializers.ROTATIONS);
 	}
 
 	private double prevAttachmentOffsetX, prevAttachmentOffsetY, prevAttachmentOffsetZ;
 	private double attachmentOffsetX, attachmentOffsetY, attachmentOffsetZ;
 
-	private Vector3d attachmentNormal = new Vector3d(0, 1, 0);
-	private Vector3d prevAttachmentNormal = new Vector3d(0, 1, 0);
+	private Vec3 attachmentNormal = new Vec3(0, 1, 0);
+	private Vec3 prevAttachmentNormal = new Vec3(0, 1, 0);
 
 	private float prevOrientationYawDelta;
 	private float orientationYawDelta;
 
 	private double lastAttachmentOffsetX, lastAttachmentOffsetY, lastAttachmentOffsetZ;
-	private Vector3d lastAttachmentOrientationNormal = new Vector3d(0, 1, 0);
+	private Vec3 lastAttachmentOrientationNormal = new Vec3(0, 1, 0);
 
 	private int attachedTicks = 5;
 
-	private Vector3d attachedSides = new Vector3d(0, 0, 0);
-	private Vector3d prevAttachedSides = new Vector3d(0, 0, 0);
+	private Vec3 attachedSides = new Vec3(0, 0, 0);
+	private Vec3 prevAttachedSides = new Vec3(0, 0, 0);
 
 	private boolean canClimbInWater = false;
 	private boolean canClimbInLava = false;
@@ -140,18 +140,18 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 	private float collisionsSmoothingRange = 1.25f;
 
 	private Orientation orientation;
-	private Pair<Direction, Vector3d> groundDirecton;
+	private Pair<Direction, Vec3> groundDirecton;
 
 	private Orientation renderOrientation;
 
 	private float nextStepDistance, nextFlap;
-	private Vector3d preWalkingPosition;
+	private Vec3 preWalkingPosition;
 
 	private double preMoveY;
 
-	private Vector3d jumpDir;
+	private Vec3 jumpDir;
 
-	private ClimberEntityMixin(EntityType<? extends CreatureEntity> type, World worldIn) {
+	private ClimberEntityMixin(EntityType<? extends PathfinderMob> type, Level worldIn) {
 		super(type, worldIn);
 	}
 
@@ -166,7 +166,7 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 	}
 
 	@Inject(method = "createNavigation", at = @At("HEAD"), cancellable = true)
-	private void onCreateNavigator(World world, CallbackInfoReturnable<PathNavigator> ci) {
+	private void onCreateNavigator(Level world, CallbackInfoReturnable<PathNavigation> ci) {
 		BetterSpiderPathNavigator<ClimberEntityMixin> navigate = new BetterSpiderPathNavigator<ClimberEntityMixin>(this, world, false);
 		navigate.setCanFloat(true);
 		ci.setReturnValue(navigate);
@@ -179,11 +179,11 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 			this.entityData.define(MOVEMENT_TARGET_Y, 0.0f);
 			this.entityData.define(MOVEMENT_TARGET_Z, 0.0f);
 
-			for(DataParameter<Optional<BlockPos>> pathingTarget : PATHING_TARGETS) {
+			for(EntityDataAccessor<Optional<BlockPos>> pathingTarget : PATHING_TARGETS) {
 				this.entityData.define(pathingTarget, Optional.empty());
 			}
 
-			for(DataParameter<Direction> pathingSide : PATHING_SIDES) {
+			for(EntityDataAccessor<Direction> pathingSide : PATHING_SIDES) {
 				this.entityData.define(pathingSide, Direction.DOWN);
 			}
 		}
@@ -194,7 +194,7 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 	}
 
 	@Override
-	public void onWrite(CompoundNBT nbt) {
+	public void onWrite(CompoundTag nbt) {
 		nbt.putDouble("SpidersTPO.AttachmentNormalX", this.attachmentNormal.x);
 		nbt.putDouble("SpidersTPO.AttachmentNormalY", this.attachmentNormal.y);
 		nbt.putDouble("SpidersTPO.AttachmentNormalZ", this.attachmentNormal.z);
@@ -203,8 +203,8 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 	}
 
 	@Override
-	public void onRead(CompoundNBT nbt) {
-		this.prevAttachmentNormal = this.attachmentNormal = new Vector3d(
+	public void onRead(CompoundTag nbt) {
+		this.prevAttachmentNormal = this.attachmentNormal = new Vec3(
 				nbt.getDouble("SpidersTPO.AttachmentNormalX"),
 				nbt.getDouble("SpidersTPO.AttachmentNormalY"),
 				nbt.getDouble("SpidersTPO.AttachmentNormalZ")
@@ -256,7 +256,7 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 	}
 
 	@Override
-	public float getBridgePathingMalus(MobEntity entity, BlockPos pos, PathPoint fallPathPoint) {
+	public float getBridgePathingMalus(Mob entity, BlockPos pos, Node fallPathPoint) {
 		return -1.0f;
 	}
 
@@ -272,11 +272,11 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 
 	@Override
 	public float getMovementSpeed() {
-		ModifiableAttributeInstance attribute = this.getAttribute(Attributes.MOVEMENT_SPEED); //MOVEMENT_SPEED
+		AttributeInstance attribute = this.getAttribute(Attributes.MOVEMENT_SPEED); //MOVEMENT_SPEED
 		return attribute != null ? (float) attribute.getValue() : 1.0f;
 	}
 
-	private static double calculateXOffset(AxisAlignedBB aabb, AxisAlignedBB other, double offsetX) {
+	private static double calculateXOffset(AABB aabb, AABB other, double offsetX) {
 		if(other.maxY > aabb.minY && other.minY < aabb.maxY && other.maxZ > aabb.minZ && other.minZ < aabb.maxZ) {
 			if(offsetX > 0.0D && other.maxX <= aabb.minX) {
 				double dx = aabb.minX - other.maxX;
@@ -298,7 +298,7 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 		}
 	}
 
-	private static double calculateYOffset(AxisAlignedBB aabb, AxisAlignedBB other, double offsetY) {
+	private static double calculateYOffset(AABB aabb, AABB other, double offsetY) {
 		if(other.maxX > aabb.minX && other.minX < aabb.maxX && other.maxZ > aabb.minZ && other.minZ < aabb.maxZ) {
 			if(offsetY > 0.0D && other.maxY <= aabb.minY) {
 				double dy = aabb.minY - other.maxY;
@@ -320,7 +320,7 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 		}
 	}
 
-	private static double calculateZOffset(AxisAlignedBB aabb, AxisAlignedBB other, double offsetZ) {
+	private static double calculateZOffset(AABB aabb, AABB other, double offsetZ) {
 		if(other.maxX > aabb.minX && other.minX < aabb.maxX && other.maxY > aabb.minY && other.minY < aabb.maxY) {
 			if(offsetZ > 0.0D && other.maxZ <= aabb.minZ) {
 				double dz = aabb.minZ - other.maxZ;
@@ -345,12 +345,12 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 	private void updateWalkingSide() {
 		Direction avoidPathingFacing = null;
 
-		AxisAlignedBB entityBox = this.getBoundingBox();
+		AABB entityBox = this.getBoundingBox();
 
 		double closestFacingDst = Double.MAX_VALUE;
 		Direction closestFacing = null;
 
-		Vector3d weighting = new Vector3d(0, 0, 0);
+		Vec3 weighting = new Vec3(0, 0, 0);
 
 		float stickingDistance = this.zza != 0 ? 1.5f : 0.1f;
 
@@ -359,11 +359,11 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 				continue;
 			}
 
-			List<AxisAlignedBB> collisionBoxes = this.getCollisionBoxes(entityBox.inflate(0.2f).expandTowards(facing.getStepX() * stickingDistance, facing.getStepY() * stickingDistance, facing.getStepZ() * stickingDistance));
+			List<AABB> collisionBoxes = this.getCollisionBoxes(entityBox.inflate(0.2f).expandTowards(facing.getStepX() * stickingDistance, facing.getStepY() * stickingDistance, facing.getStepZ() * stickingDistance));
 
 			double closestDst = Double.MAX_VALUE;
 
-			for(AxisAlignedBB collisionBox : collisionBoxes) {
+			for(AABB collisionBox : collisionBoxes) {
 				switch(facing) {
 				case EAST:
 				case WEST:
@@ -386,19 +386,19 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 			}
 
 			if(closestDst < Double.MAX_VALUE) {
-				weighting = weighting.add(new Vector3d(facing.getStepX(), facing.getStepY(), facing.getStepZ()).scale(1 - Math.min(closestDst, stickingDistance) / stickingDistance));
+				weighting = weighting.add(new Vec3(facing.getStepX(), facing.getStepY(), facing.getStepZ()).scale(1 - Math.min(closestDst, stickingDistance) / stickingDistance));
 			}
 		}
 
 		if(closestFacing == null) {
-			this.groundDirecton = Pair.of(Direction.DOWN, new Vector3d(0, -1, 0));
+			this.groundDirecton = Pair.of(Direction.DOWN, new Vec3(0, -1, 0));
 		} else {
 			this.groundDirecton = Pair.of(closestFacing, weighting.normalize().add(0, -0.001f, 0).normalize());
 		}
 	}
 
 	@Override
-	public Pair<Direction, Vector3d> getGroundDirection() {
+	public Pair<Direction, Vec3> getGroundDirection() {
 		return this.groundDirecton;
 	}
 
@@ -436,22 +436,22 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 	}
 
 	@Override
-	public Vector3d onLookAt(Type anchor, Vector3d vec) {
-		Vector3d dir = vec.subtract(this.position());
+	public Vec3 onLookAt(Anchor anchor, Vec3 vec) {
+		Vec3 dir = vec.subtract(this.position());
 		dir = this.getOrientation().getLocal(dir);
 		return dir;
 	}
 
 	@Override
 	public void onTick() {
-		if(!this.level.isClientSide && this.level instanceof ServerWorld) {
-			EntityTracker entityTracker = ((ServerWorld) this.level).getChunkSource().chunkMap.entityMap.get(this.getId());
+		if(!this.level.isClientSide && this.level instanceof ServerLevel) {
+			TrackedEntity entityTracker = ((ServerLevel) this.level).getChunkSource().chunkMap.entityMap.get(this.getId());
 
 			//Prevent premature syncing of position causing overly smoothed movement
 			if(entityTracker != null && entityTracker.serverEntity.tickCount % entityTracker.serverEntity.updateInterval == 0) {
 				Orientation orientation = this.getOrientation();
 
-				Vector3d look = orientation.getGlobal(this.yRot, this.xRot);
+				Vec3 look = orientation.getGlobal(this.yRot, this.xRot);
 				this.entityData.set(ROTATION_BODY, new Rotations((float) look.x, (float) look.y, (float) look.z));
 
 				look = orientation.getGlobal(this.yHeadRot, 0.0f);
@@ -459,10 +459,10 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 
 				if(this.shouldTrackPathingTargets()) {
 					if(this.xxa != 0) {
-						Vector3d forwardVector = orientation.getGlobal(this.yRot, 0);
-						Vector3d strafeVector = orientation.getGlobal(this.yRot + 90.0f, 0);
+						Vec3 forwardVector = orientation.getGlobal(this.yRot, 0);
+						Vec3 strafeVector = orientation.getGlobal(this.yRot + 90.0f, 0);
 
-						Vector3d offset = forwardVector.scale(this.zza).add(strafeVector.scale(this.xxa)).normalize();
+						Vec3 offset = forwardVector.scale(this.zza).add(strafeVector.scale(this.xxa)).normalize();
 
 						this.entityData.set(MOVEMENT_TARGET_X, (float) (this.getX() + offset.x));
 						this.entityData.set(MOVEMENT_TARGET_Y, (float) (this.getY() + this.getBbHeight() * 0.5f + offset.y));
@@ -477,11 +477,11 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 					if(path != null) {
 						int i = 0;
 
-						for(DataParameter<Optional<BlockPos>> pathingTarget : PATHING_TARGETS) {
-							DataParameter<Direction> pathingSide = PATHING_SIDES.get(i);
+						for(EntityDataAccessor<Optional<BlockPos>> pathingTarget : PATHING_TARGETS) {
+							EntityDataAccessor<Direction> pathingSide = PATHING_SIDES.get(i);
 
 							if(path.getNextNodeIndex() + i < path.getNodeCount()) {
-								PathPoint point = path.getNode(path.getNextNodeIndex() + i);
+								Node point = path.getNode(path.getNextNodeIndex() + i);
 
 								this.entityData.set(pathingTarget, Optional.of(new BlockPos(point.x, point.y, point.z)));
 
@@ -503,11 +503,11 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 							i++;
 						}
 					} else {
-						for(DataParameter<Optional<BlockPos>> pathingTarget : PATHING_TARGETS) {
+						for(EntityDataAccessor<Optional<BlockPos>> pathingTarget : PATHING_TARGETS) {
 							this.entityData.set(pathingTarget, Optional.empty());
 						}
 
-						for(DataParameter<Direction> pathingSide : PATHING_SIDES) {
+						for(EntityDataAccessor<Direction> pathingSide : PATHING_SIDES) {
 							this.entityData.set(pathingSide, Direction.DOWN);
 						}
 					}
@@ -528,9 +528,9 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 
 	@Override
 	@Nullable
-	public Vector3d getTrackedMovementTarget() {
+	public Vec3 getTrackedMovementTarget() {
 		if(this.shouldTrackPathingTargets()) {
-			return new Vector3d(this.entityData.get(MOVEMENT_TARGET_X), this.entityData.get(MOVEMENT_TARGET_Y), this.entityData.get(MOVEMENT_TARGET_Z));
+			return new Vec3(this.entityData.get(MOVEMENT_TARGET_X), this.entityData.get(MOVEMENT_TARGET_Y), this.entityData.get(MOVEMENT_TARGET_Z));
 		}
 
 		return null;
@@ -543,7 +543,7 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 			List<PathingTarget> pathingTargets = new ArrayList<>(PATHING_TARGETS.size());
 
 			int i = 0;
-			for(DataParameter<Optional<BlockPos>> key : PATHING_TARGETS) {
+			for(EntityDataAccessor<Optional<BlockPos>> key : PATHING_TARGETS) {
 				BlockPos pos = this.entityData.get(key).orElse(null);
 
 				if(pos != null) {
@@ -564,18 +564,18 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 		return 0.075f;
 	}
 
-	private void forEachCollisonBox(AxisAlignedBB aabb, VoxelShapes.ILineConsumer action) {
-		int minChunkX = ((MathHelper.floor(aabb.minX - 1.0E-7D) - 1) >> 4);
-		int maxChunkX = ((MathHelper.floor(aabb.maxX + 1.0E-7D) + 1) >> 4);
-		int minChunkZ = ((MathHelper.floor(aabb.minZ - 1.0E-7D) - 1) >> 4);
-		int maxChunkZ = ((MathHelper.floor(aabb.maxZ + 1.0E-7D) + 1) >> 4);
+	private void forEachCollisonBox(AABB aabb, Shapes.DoubleLineConsumer action) {
+		int minChunkX = ((Mth.floor(aabb.minX - 1.0E-7D) - 1) >> 4);
+		int maxChunkX = ((Mth.floor(aabb.maxX + 1.0E-7D) + 1) >> 4);
+		int minChunkZ = ((Mth.floor(aabb.minZ - 1.0E-7D) - 1) >> 4);
+		int maxChunkZ = ((Mth.floor(aabb.maxZ + 1.0E-7D) + 1) >> 4);
 
 		int width = maxChunkX - minChunkX + 1;
 		int depth = maxChunkZ - minChunkZ + 1;
 
-		IBlockReader[] blockReaderCache = new IBlockReader[width * depth];
+		BlockGetter[] blockReaderCache = new BlockGetter[width * depth];
 
-		ICollisionReader collisionReader = this.level;
+		CollisionGetter collisionReader = this.level;
 
 		for(int cx = minChunkX; cx <= maxChunkX; cx++) {
 			for(int cz = minChunkZ; cz <= maxChunkZ; cz++) {
@@ -583,9 +583,9 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 			}
 		}
 
-		ICollisionReader cachedCollisionReader = new ICollisionReader() {
+		CollisionGetter cachedCollisionReader = new CollisionGetter() {
 			@Override
-			public TileEntity getBlockEntity(BlockPos pos) {
+			public BlockEntity getBlockEntity(BlockPos pos) {
 				return collisionReader.getBlockEntity(pos);
 			}
 
@@ -605,24 +605,24 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 			}
 
 			@Override
-			public Stream<VoxelShape> getEntityCollisions(Entity entity, AxisAlignedBB aabb, Predicate<Entity> predicate) {
+			public Stream<VoxelShape> getEntityCollisions(Entity entity, AABB aabb, Predicate<Entity> predicate) {
 				return collisionReader.getEntityCollisions(entity, aabb, predicate);
 			}
 
 			@Override
-			public IBlockReader getChunkForCollisions(int chunkX, int chunkZ) {
+			public BlockGetter getChunkForCollisions(int chunkX, int chunkZ) {
 				return blockReaderCache[(chunkX - minChunkX) + (chunkZ - minChunkZ) * width];
 			}
 		};
 
-		Stream<VoxelShape> shapes = StreamSupport.stream(new VoxelShapeSpliterator(cachedCollisionReader, this, aabb, this::canClimbOnBlock), false);
+		Stream<VoxelShape> shapes = StreamSupport.stream(new CollisionSpliterator(cachedCollisionReader, this, aabb, this::canClimbOnBlock), false);
 
 		shapes.forEach(shape -> shape.forAllBoxes(action));
 	}
 
-	private List<AxisAlignedBB> getCollisionBoxes(AxisAlignedBB aabb) {
-		List<AxisAlignedBB> boxes = new ArrayList<>();
-		this.forEachCollisonBox(aabb, (minX, minY, minZ, maxX, maxY, maxZ) -> boxes.add(new AxisAlignedBB(minX, minY, minZ, maxX, maxY, maxZ)));
+	private List<AABB> getCollisionBoxes(AABB aabb) {
+		List<AABB> boxes = new ArrayList<>();
+		this.forEachCollisonBox(aabb, (minX, minY, minZ, maxX, maxY, maxZ) -> boxes.add(new AABB(minX, minY, minZ, maxX, maxY, maxZ)));
 		return boxes;
 	}
 
@@ -638,27 +638,27 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 	}
 
 	private void updateOffsetsAndOrientation() {
-		Vector3d direction = this.getOrientation().getGlobal(this.yRot, this.xRot);
+		Vec3 direction = this.getOrientation().getGlobal(this.yRot, this.xRot);
 
 		boolean isAttached = false;
 
 		double baseStickingOffsetX = 0.0f;
 		double baseStickingOffsetY = this.getVerticalOffset(1);
 		double baseStickingOffsetZ = 0.0f;
-		Vector3d baseOrientationNormal = new Vector3d(0, 1, 0);
+		Vec3 baseOrientationNormal = new Vec3(0, 1, 0);
 
 		if(!this.isTravelingInFluid && this.onGround && this.getVehicle() == null) {
-			Vector3d p = this.position();
+			Vec3 p = this.position();
 
-			Vector3d s = p.add(0, this.getBbHeight() * 0.5f, 0);
-			AxisAlignedBB inclusionBox = new AxisAlignedBB(s.x, s.y, s.z, s.x, s.y, s.z).inflate(this.collisionsInclusionRange);
+			Vec3 s = p.add(0, this.getBbHeight() * 0.5f, 0);
+			AABB inclusionBox = new AABB(s.x, s.y, s.z, s.x, s.y, s.z).inflate(this.collisionsInclusionRange);
 
-			Pair<Vector3d, Vector3d> attachmentPoint = CollisionSmoothingUtil.findClosestPoint(consumer -> this.forEachCollisonBox(inclusionBox, consumer), s, this.attachmentNormal.scale(-1), this.collisionsSmoothingRange, 1.0f, 0.001f, 20, 0.05f, s);
+			Pair<Vec3, Vec3> attachmentPoint = CollisionSmoothingUtil.findClosestPoint(consumer -> this.forEachCollisonBox(inclusionBox, consumer), s, this.attachmentNormal.scale(-1), this.collisionsSmoothingRange, 1.0f, 0.001f, 20, 0.05f, s);
 
-			AxisAlignedBB entityBox = this.getBoundingBox();
+			AABB entityBox = this.getBoundingBox();
 
 			if(attachmentPoint != null) {
-				Vector3d attachmentPos = attachmentPoint.getLeft();
+				Vec3 attachmentPos = attachmentPoint.getLeft();
 
 				double dx = Math.max(entityBox.minX - attachmentPos.x, attachmentPos.x - entityBox.maxX);
 				double dy = Math.max(entityBox.minY - attachmentPos.y, attachmentPos.y - entityBox.maxY);
@@ -667,9 +667,9 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 				if(Math.max(dx, Math.max(dy, dz)) < 0.5f) {
 					isAttached = true;
 
-					this.lastAttachmentOffsetX = MathHelper.clamp(attachmentPos.x - p.x, -this.getBbWidth() / 2, this.getBbWidth() / 2);
-					this.lastAttachmentOffsetY = MathHelper.clamp(attachmentPos.y - p.y, 0, this.getBbHeight());
-					this.lastAttachmentOffsetZ = MathHelper.clamp(attachmentPos.z - p.z, -this.getBbWidth() / 2, this.getBbWidth() / 2);
+					this.lastAttachmentOffsetX = Mth.clamp(attachmentPos.x - p.x, -this.getBbWidth() / 2, this.getBbWidth() / 2);
+					this.lastAttachmentOffsetY = Mth.clamp(attachmentPos.y - p.y, 0, this.getBbHeight());
+					this.lastAttachmentOffsetZ = Mth.clamp(attachmentPos.z - p.z, -this.getBbWidth() / 2, this.getBbWidth() / 2);
 					this.lastAttachmentOrientationNormal = attachmentPoint.getRight();
 				}
 			}
@@ -703,20 +703,20 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 		this.prevOrientationYawDelta = this.orientationYawDelta;
 		this.orientationYawDelta = yawDelta;
 
-		this.yRot = MathHelper.wrapDegrees(this.yRot + yawDelta);
+		this.yRot = Mth.wrapDegrees(this.yRot + yawDelta);
 		this.yRotO = this.wrapAngleInRange(this.yRotO/* + yawDelta*/, this.yRot);
-		this.lerpYRot = MathHelper.wrapDegrees(this.lerpYRot + yawDelta);
+		this.lerpYRot = Mth.wrapDegrees(this.lerpYRot + yawDelta);
 
-		this.yBodyRot = MathHelper.wrapDegrees(this.yBodyRot + yawDelta);
+		this.yBodyRot = Mth.wrapDegrees(this.yBodyRot + yawDelta);
 		this.yBodyRotO = this.wrapAngleInRange(this.yBodyRotO/* + yawDelta*/, this.yBodyRot);
 
-		this.yHeadRot = MathHelper.wrapDegrees(this.yHeadRot + yawDelta);
+		this.yHeadRot = Mth.wrapDegrees(this.yHeadRot + yawDelta);
 		this.yHeadRotO = this.wrapAngleInRange(this.yHeadRotO/* + yawDelta*/, this.yHeadRot);
-		this.lyHeadRot = MathHelper.wrapDegrees(this.lyHeadRot + yawDelta);
+		this.lyHeadRot = Mth.wrapDegrees(this.lyHeadRot + yawDelta);
 
-		this.xRot = MathHelper.wrapDegrees(this.xRot + pitchDelta);
+		this.xRot = Mth.wrapDegrees(this.xRot + pitchDelta);
 		this.xRotO = this.wrapAngleInRange(this.xRotO/* + pitchDelta*/, this.xRot);
-		this.lerpXRot = MathHelper.wrapDegrees(this.lerpXRot + pitchDelta);
+		this.lerpXRot = Mth.wrapDegrees(this.lerpXRot + pitchDelta);
 	}
 
 	private float wrapAngleInRange(float angle, float target) {
@@ -733,27 +733,27 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 
 	@Override
 	public Orientation calculateOrientation(float partialTicks) {
-		Vector3d attachmentNormal = this.prevAttachmentNormal.add(this.attachmentNormal.subtract(this.prevAttachmentNormal).scale(partialTicks));
+		Vec3 attachmentNormal = this.prevAttachmentNormal.add(this.attachmentNormal.subtract(this.prevAttachmentNormal).scale(partialTicks));
 
-		Vector3d localZ = new Vector3d(0, 0, 1);
-		Vector3d localY = new Vector3d(0, 1, 0);
-		Vector3d localX = new Vector3d(1, 0, 0);
+		Vec3 localZ = new Vec3(0, 0, 1);
+		Vec3 localY = new Vec3(0, 1, 0);
+		Vec3 localX = new Vec3(1, 0, 0);
 
 		float componentZ = (float) localZ.dot(attachmentNormal);
 		float componentY;
 		float componentX = (float) localX.dot(attachmentNormal);
 
-		float yaw = (float) Math.toDegrees(MathHelper.atan2(componentX, componentZ));
+		float yaw = (float) Math.toDegrees(Mth.atan2(componentX, componentZ));
 
-		localZ = new Vector3d(Math.sin(Math.toRadians(yaw)), 0, Math.cos(Math.toRadians(yaw)));
-		localY = new Vector3d(0, 1, 0);
-		localX = new Vector3d(Math.sin(Math.toRadians(yaw - 90)), 0, Math.cos(Math.toRadians(yaw - 90)));
+		localZ = new Vec3(Math.sin(Math.toRadians(yaw)), 0, Math.cos(Math.toRadians(yaw)));
+		localY = new Vec3(0, 1, 0);
+		localX = new Vec3(Math.sin(Math.toRadians(yaw - 90)), 0, Math.cos(Math.toRadians(yaw - 90)));
 
 		componentZ = (float) localZ.dot(attachmentNormal);
 		componentY = (float) localY.dot(attachmentNormal);
 		componentX = (float) localX.dot(attachmentNormal);
 
-		float pitch = (float) Math.toDegrees(MathHelper.atan2(MathHelper.sqrt(componentX * componentX + componentZ * componentZ), componentY));
+		float pitch = (float) Math.toDegrees(Mth.atan2(Mth.sqrt(componentX * componentX + componentZ * componentZ), componentY));
 
 		Matrix4f m = new Matrix4f();
 
@@ -761,9 +761,9 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 		m.multiply(new Matrix4f((float) Math.toRadians(pitch), 1, 0, 0));
 		m.multiply(new Matrix4f((float) Math.toRadians((float) Math.signum(0.5f - componentY - componentZ - componentX) * yaw), 0, 1, 0));
 
-		localZ = m.multiply(new Vector3d(0, 0, -1));
-		localY = m.multiply(new Vector3d(0, 1, 0));
-		localX = m.multiply(new Vector3d(1, 0, 0));
+		localZ = m.multiply(new Vec3(0, 0, -1));
+		localY = m.multiply(new Vec3(0, 1, 0));
+		localX = m.multiply(new Vec3(1, 0, 0));
 
 		return new Orientation(attachmentNormal, localZ, localY, localX, componentZ, componentY, componentX, yaw, pitch);
 	}
@@ -784,10 +784,10 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 	}
 
 	@Override
-	public void onNotifyDataManagerChange(DataParameter<?> key) {
+	public void onNotifyDataManagerChange(EntityDataAccessor<?> key) {
 		if(ROTATION_BODY.equals(key)) {
 			Rotations rotation = this.entityData.get(ROTATION_BODY);
-			Vector3d look = new Vector3d(rotation.getX(), rotation.getY(), rotation.getZ());
+			Vec3 look = new Vec3(rotation.getX(), rotation.getY(), rotation.getZ());
 
 			Pair<Float, Float> rotations = this.getOrientation().getLocalRotation(look);
 
@@ -795,7 +795,7 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 			this.lerpXRot = rotations.getRight();
 		} else if(ROTATION_HEAD.equals(key)) {
 			Rotations rotation = this.entityData.get(ROTATION_HEAD);
-			Vector3d look = new Vector3d(rotation.getX(), rotation.getY(), rotation.getZ());
+			Vec3 look = new Vec3(rotation.getX(), rotation.getY(), rotation.getZ());
 
 			Pair<Float, Float> rotations = this.getOrientation().getLocalRotation(look);
 
@@ -809,11 +809,11 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 			return 0;
 		}
 
-		ModifiableAttributeInstance gravity = this.getAttribute(net.minecraftforge.common.ForgeMod.ENTITY_GRAVITY.get());
+		AttributeInstance gravity = this.getAttribute(net.minecraftforge.common.ForgeMod.ENTITY_GRAVITY.get());
 
 		boolean isFalling = this.getDeltaMovement().y <= 0.0D;
 
-		if(isFalling && this.hasEffect(Effects.SLOW_FALLING)) {
+		if(isFalling && this.hasEffect(MobEffects.SLOW_FALLING)) {
 			if(!gravity.hasModifier(SLOW_FALLING)) {
 				gravity.addTransientModifier(SLOW_FALLING);
 			}
@@ -824,7 +824,7 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 		return gravity.getValue();
 	}
 
-	private Vector3d getStickingForce(Pair<Direction, Vector3d> walkingSide) {
+	private Vec3 getStickingForce(Pair<Direction, Vec3> walkingSide) {
 		double uprightness = Math.max(this.attachmentNormal.y, 0);
 		double gravity = this.getGravity();
 		double stickingForce = gravity * uprightness + 0.08D * (1 - uprightness);
@@ -832,7 +832,7 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 	}
 
 	@Override
-	public void setJumpDirection(Vector3d dir) {
+	public void setJumpDirection(Vec3 dir) {
 		this.jumpDir = dir != null ? dir.normalize() : null;
 	}
 
@@ -840,19 +840,19 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 	public boolean onJump() {
 		if(this.jumpDir != null) {
 			float jumpStrength = this.getJumpPower();
-			if(this.hasEffect(Effects.JUMP)) {
-				jumpStrength += 0.1F * (float)(this.getEffect(Effects.JUMP).getAmplifier() + 1);
+			if(this.hasEffect(MobEffects.JUMP)) {
+				jumpStrength += 0.1F * (float)(this.getEffect(MobEffects.JUMP).getAmplifier() + 1);
 			}
 			
-			Vector3d motion = this.getDeltaMovement();
+			Vec3 motion = this.getDeltaMovement();
 
-			Vector3d orthogonalMotion = this.jumpDir.scale(this.jumpDir.dot(motion));
-			Vector3d tangentialMotion = motion.subtract(orthogonalMotion);
+			Vec3 orthogonalMotion = this.jumpDir.scale(this.jumpDir.dot(motion));
+			Vec3 tangentialMotion = motion.subtract(orthogonalMotion);
 
 			this.setDeltaMovement(tangentialMotion.x + this.jumpDir.x * jumpStrength, tangentialMotion.y + this.jumpDir.y * jumpStrength, tangentialMotion.z + this.jumpDir.z * jumpStrength);
 
 			if(this.isSprinting()) {
-				Vector3d boost = this.getOrientation().getGlobal(this.yRot, 0).scale(0.2f);
+				Vec3 boost = this.getOrientation().getGlobal(this.yRot, 0).scale(0.2f);
 				this.setDeltaMovement(this.getDeltaMovement().add(boost));
 			}
 
@@ -866,7 +866,7 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 	}
 
 	@Override
-	public boolean onTravel(Vector3d relative, boolean pre) {
+	public boolean onTravel(Vec3 relative, boolean pre) {
 		if(pre) {
 			boolean canTravel = this.isEffectiveAi() || this.isControlledByLocalInstance();
 
@@ -906,20 +906,20 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 		return this.onGround ? this.getSpeed() * (0.16277136F / (slipperiness * slipperiness * slipperiness)) : this.flyingSpeed;
 	}
 
-	private void travelOnGround(Vector3d relative) {
+	private void travelOnGround(Vec3 relative) {
 		Orientation orientation = this.getOrientation();
 
-		Vector3d forwardVector = orientation.getGlobal(this.yRot, 0);
-		Vector3d strafeVector = orientation.getGlobal(this.yRot + 90.0f, 0);
-		Vector3d upVector = orientation.getGlobal(this.yRot, -90.0f);
+		Vec3 forwardVector = orientation.getGlobal(this.yRot, 0);
+		Vec3 strafeVector = orientation.getGlobal(this.yRot + 90.0f, 0);
+		Vec3 upVector = orientation.getGlobal(this.yRot, -90.0f);
 
-		Pair<Direction, Vector3d> groundDirection = this.getGroundDirection();
+		Pair<Direction, Vec3> groundDirection = this.getGroundDirection();
 
-		Vector3d stickingForce = this.getStickingForce(groundDirection);
+		Vec3 stickingForce = this.getStickingForce(groundDirection);
 
 		boolean isFalling = this.getDeltaMovement().y <= 0.0D;
 
-		if(isFalling && this.hasEffect(Effects.SLOW_FALLING)) {
+		if(isFalling && this.hasEffect(MobEffects.SLOW_FALLING)) {
 			this.fallDistance = 0;
 		}
 
@@ -936,40 +936,40 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 
 			float f = forward * forward + strafe * strafe;
 			if(f >= 1.0E-4F) {
-				f = Math.max(MathHelper.sqrt(f), 1.0f);
+				f = Math.max(Mth.sqrt(f), 1.0f);
 				f = this.getRelevantMoveFactor(slipperiness) / f;
 				forward *= f;
 				strafe *= f;
 
-				Vector3d movementOffset = new Vector3d(forwardVector.x * forward + strafeVector.x * strafe, forwardVector.y * forward + strafeVector.y * strafe, forwardVector.z * forward + strafeVector.z * strafe);
+				Vec3 movementOffset = new Vec3(forwardVector.x * forward + strafeVector.x * strafe, forwardVector.y * forward + strafeVector.y * strafe, forwardVector.z * forward + strafeVector.z * strafe);
 
 				double px = this.getX();
 				double py = this.getY();
 				double pz = this.getZ();
-				Vector3d motion = this.getDeltaMovement();
-				AxisAlignedBB aabb = this.getBoundingBox();
+				Vec3 motion = this.getDeltaMovement();
+				AABB aabb = this.getBoundingBox();
 
 				//Probe actual movement vector
 				this.move(MoverType.SELF, movementOffset);
 
-				Vector3d movementDir = new Vector3d(this.getX() - px, this.getY() - py, this.getZ() - pz).normalize();
+				Vec3 movementDir = new Vec3(this.getX() - px, this.getY() - py, this.getZ() - pz).normalize();
 
 				this.setBoundingBox(aabb);
 				this.setLocationFromBoundingbox();
 				this.setDeltaMovement(motion);
 
 				//Probe collision normal
-				Vector3d probeVector = new Vector3d(Math.abs(movementDir.x) < 0.001D ? -Math.signum(upVector.x) : 0, Math.abs(movementDir.y) < 0.001D ? -Math.signum(upVector.y) : 0, Math.abs(movementDir.z) < 0.001D ? -Math.signum(upVector.z) : 0).normalize().scale(0.0001D);
+				Vec3 probeVector = new Vec3(Math.abs(movementDir.x) < 0.001D ? -Math.signum(upVector.x) : 0, Math.abs(movementDir.y) < 0.001D ? -Math.signum(upVector.y) : 0, Math.abs(movementDir.z) < 0.001D ? -Math.signum(upVector.z) : 0).normalize().scale(0.0001D);
 				this.move(MoverType.SELF, probeVector);
 
-				Vector3d collisionNormal = new Vector3d(Math.abs(this.getX() - px - probeVector.x) > 0.000001D ? Math.signum(-probeVector.x) : 0, Math.abs(this.getY() - py - probeVector.y) > 0.000001D ? Math.signum(-probeVector.y) : 0, Math.abs(this.getZ() - pz - probeVector.z) > 0.000001D ? Math.signum(-probeVector.z) : 0).normalize();
+				Vec3 collisionNormal = new Vec3(Math.abs(this.getX() - px - probeVector.x) > 0.000001D ? Math.signum(-probeVector.x) : 0, Math.abs(this.getY() - py - probeVector.y) > 0.000001D ? Math.signum(-probeVector.y) : 0, Math.abs(this.getZ() - pz - probeVector.z) > 0.000001D ? Math.signum(-probeVector.z) : 0).normalize();
 
 				this.setBoundingBox(aabb);
 				this.setLocationFromBoundingbox();
 				this.setDeltaMovement(motion);
 
 				//Movement vector projected to surface
-				Vector3d surfaceMovementDir = movementDir.subtract(collisionNormal.scale(collisionNormal.dot(movementDir))).normalize();
+				Vec3 surfaceMovementDir = movementDir.subtract(collisionNormal.scale(collisionNormal.dot(movementDir))).normalize();
 
 				boolean isInnerCorner = Math.abs(collisionNormal.x) + Math.abs(collisionNormal.y) + Math.abs(collisionNormal.z) > 1.0001f;
 
@@ -981,7 +981,7 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 				//Nullify sticking force along movement vector projected to surface
 				stickingForce = stickingForce.subtract(surfaceMovementDir.scale(surfaceMovementDir.normalize().dot(stickingForce)));
 
-				float moveSpeed = MathHelper.sqrt(forward * forward + strafe * strafe);
+				float moveSpeed = Mth.sqrt(forward * forward + strafe * strafe);
 				this.setDeltaMovement(this.getDeltaMovement().add(movementDir.scale(moveSpeed)));
 			}
 		}
@@ -991,12 +991,12 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 		double px = this.getX();
 		double py = this.getY();
 		double pz = this.getZ();
-		Vector3d motion = this.getDeltaMovement();
+		Vec3 motion = this.getDeltaMovement();
 
 		this.move(MoverType.SELF, motion);
 
 		this.prevAttachedSides = this.attachedSides;
-		this.attachedSides = new Vector3d(Math.abs(this.getX() - px - motion.x) > 0.001D ? -Math.signum(motion.x) : 0, Math.abs(this.getY() - py - motion.y) > 0.001D ? -Math.signum(motion.y) : 0, Math.abs(this.getZ() - pz - motion.z) > 0.001D ? -Math.signum(motion.z) : 0);
+		this.attachedSides = new Vec3(Math.abs(this.getX() - px - motion.x) > 0.001D ? -Math.signum(motion.x) : 0, Math.abs(this.getY() - py - motion.y) > 0.001D ? -Math.signum(motion.y) : 0, Math.abs(this.getZ() - pz - motion.z) > 0.001D ? -Math.signum(motion.z) : 0);
 
 		float slipperiness = 0.91f;
 
@@ -1008,8 +1008,8 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 		}
 
 		motion = this.getDeltaMovement();
-		Vector3d orthogonalMotion = upVector.scale(upVector.dot(motion));
-		Vector3d tangentialMotion = motion.subtract(orthogonalMotion);
+		Vec3 orthogonalMotion = upVector.scale(upVector.dot(motion));
+		Vec3 tangentialMotion = motion.subtract(orthogonalMotion);
 
 		this.setDeltaMovement(tangentialMotion.x * slipperiness + orthogonalMotion.x * 0.98f, tangentialMotion.y * slipperiness + orthogonalMotion.y * 0.98f, tangentialMotion.z * slipperiness + orthogonalMotion.z * 0.98f);
 
@@ -1026,23 +1026,23 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 			boolean prevCollidedVertically = this.verticalCollision;
 
 			//Offset so that AABB is moved above the new surface
-			this.move(MoverType.SELF, new Vector3d(detachedX ? -this.prevAttachedSides.x * 0.25f : 0, detachedY ? -this.prevAttachedSides.y * 0.25f : 0, detachedZ ? -this.prevAttachedSides.z * 0.25f : 0));
+			this.move(MoverType.SELF, new Vec3(detachedX ? -this.prevAttachedSides.x * 0.25f : 0, detachedY ? -this.prevAttachedSides.y * 0.25f : 0, detachedZ ? -this.prevAttachedSides.z * 0.25f : 0));
 
-			Vector3d axis = this.prevAttachedSides.normalize();
-			Vector3d attachVector = upVector.scale(-1);
+			Vec3 axis = this.prevAttachedSides.normalize();
+			Vec3 attachVector = upVector.scale(-1);
 			attachVector = attachVector.subtract(axis.scale(axis.dot(attachVector)));
 
 			if(Math.abs(attachVector.x) > Math.abs(attachVector.y) && Math.abs(attachVector.x) > Math.abs(attachVector.z)) {
-				attachVector = new Vector3d(Math.signum(attachVector.x), 0, 0);
+				attachVector = new Vec3(Math.signum(attachVector.x), 0, 0);
 			} else if(Math.abs(attachVector.y) > Math.abs(attachVector.z)) {
-				attachVector = new Vector3d(0, Math.signum(attachVector.y), 0);
+				attachVector = new Vec3(0, Math.signum(attachVector.y), 0);
 			} else {
-				attachVector = new Vector3d(0, 0, Math.signum(attachVector.z));
+				attachVector = new Vec3(0, 0, Math.signum(attachVector.z));
 			}
 
 			double attachDst = motion.length() + 0.1f;
 
-			AxisAlignedBB aabb = this.getBoundingBox();
+			AABB aabb = this.getBoundingBox();
 			motion = this.getDeltaMovement();
 
 			//Offset AABB towards new surface until it touches
@@ -1061,7 +1061,7 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 				this.horizontalCollision = prevCollidedHorizontally;
 				this.verticalCollision = prevCollidedVertically;
 			} else {
-				this.setDeltaMovement(Vector3d.ZERO);
+				this.setDeltaMovement(Vec3.ZERO);
 			}
 		}
 
@@ -1069,7 +1069,7 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 	}
 
 	@Override
-	public boolean onMove(MoverType type, Vector3d pos, boolean pre) {
+	public boolean onMove(MoverType type, Vec3 pos, boolean pre) {
 		if(pre) {
 			this.preWalkingPosition = this.position();
 			this.preMoveY = this.getY();
@@ -1088,9 +1088,9 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 	public BlockPos getAdjustedOnPosition(BlockPos onPosition) {
 		float verticalOffset = this.getVerticalOffset(1);
 
-		int x = MathHelper.floor(this.getX() + this.attachmentOffsetX - (float) this.attachmentNormal.x * (verticalOffset + 0.2f));
-		int y = MathHelper.floor(this.getY() + this.attachmentOffsetY - (float) this.attachmentNormal.y * (verticalOffset + 0.2f));
-		int z = MathHelper.floor(this.getZ() + this.attachmentOffsetZ - (float) this.attachmentNormal.z * (verticalOffset + 0.2f));
+		int x = Mth.floor(this.getX() + this.attachmentOffsetX - (float) this.attachmentNormal.x * (verticalOffset + 0.2f));
+		int y = Mth.floor(this.getY() + this.attachmentOffsetY - (float) this.attachmentNormal.y * (verticalOffset + 0.2f));
+		int z = Mth.floor(this.getZ() + this.attachmentOffsetZ - (float) this.attachmentNormal.z * (verticalOffset + 0.2f));
 		BlockPos pos = new BlockPos(x, y, z);
 
 		if(this.level.isEmptyBlock(pos) && this.attachmentNormal.y < 0.0f) {
@@ -1108,7 +1108,7 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 	@Override
 	public boolean getAdjustedCanTriggerWalking(boolean canTriggerWalking) {
 		if(this.preWalkingPosition != null && this.canClimberTriggerWalking() && !this.isPassenger()) {
-			Vector3d moved = this.position().subtract(this.preWalkingPosition);
+			Vec3 moved = this.position().subtract(this.preWalkingPosition);
 			this.preWalkingPosition = null;
 
 			BlockPos pos = this.getOnPos();
@@ -1118,11 +1118,11 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 			double dy = moved.y;
 			double dz = moved.z;
 
-			Vector3d tangentialMovement = moved.subtract(this.attachmentNormal.scale(this.attachmentNormal.dot(moved)));
+			Vec3 tangentialMovement = moved.subtract(this.attachmentNormal.scale(this.attachmentNormal.dot(moved)));
 
 			this.walkDist = (float) ((double) this.walkDist + tangentialMovement.length() * 0.6D);
 
-			this.moveDist = (float) ((double) this.moveDist + (double) MathHelper.sqrt(dx * dx + dy * dy + dz * dz) * 0.6D);
+			this.moveDist = (float) ((double) this.moveDist + (double) Mth.sqrt(dx * dx + dy * dy + dz * dz) * 0.6D);
 
 			if(this.moveDist > this.nextStepDistance && !state.isAir(this.level, pos)) {
 				this.nextStepDistance = this.nextStep();
@@ -1132,9 +1132,9 @@ public abstract class ClimberEntityMixin extends CreatureEntity implements IClim
 
 					float multiplier = controller == this ? 0.35F : 0.4F;
 
-					Vector3d motion = controller.getDeltaMovement();
+					Vec3 motion = controller.getDeltaMovement();
 
-					float swimStrength = MathHelper.sqrt(motion.x * motion.x * (double) 0.2F + motion.y * motion.y + motion.z * motion.z * 0.2F) * multiplier;
+					float swimStrength = Mth.sqrt(motion.x * motion.x * (double) 0.2F + motion.y * motion.y + motion.z * motion.z * 0.2F) * multiplier;
 					if(swimStrength > 1.0F) {
 						swimStrength = 1.0F;
 					}
