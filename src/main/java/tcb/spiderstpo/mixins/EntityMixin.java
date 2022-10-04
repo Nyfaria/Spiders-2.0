@@ -54,6 +54,12 @@ public abstract class EntityMixin implements IEntityMovementHook, IEntityReadWri
 //		ci.setReturnValue(this.getAdjustedCanTriggerWalking(ci.getReturnValue()));
 //	}
 
+	@Redirect(method = "move", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity$MovementEmission;emitsAnything()Z"))
+	public boolean bop(Entity.MovementEmission instance){
+		return this.getAdjustedCanTriggerWalking(instance.emitsAnything());
+	}
+
+
 	@Override
 	public boolean getAdjustedCanTriggerWalking(boolean canTriggerWalking) {
 		return canTriggerWalking;
