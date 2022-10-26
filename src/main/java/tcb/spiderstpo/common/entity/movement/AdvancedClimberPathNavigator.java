@@ -4,6 +4,7 @@ import javax.annotation.Nullable;
 
 import com.google.common.collect.ImmutableSet;
 
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
@@ -128,15 +129,11 @@ public class AdvancedClimberPathNavigator<T extends Mob & IClimberEntity> extend
 		double y = offsetPos.getY() + pathingOffsetY  + (dir == Direction.DOWN ? -pathingOffsetY : 0.0D) + (dir == Direction.UP ? -pathingOffsetY + marginY : 0.0D);
 		double z = offsetPos.getZ() + pathingOffsetXZ + dir.getStepZ() * marginXZ;
 
-		switch(axis) {
-		default:
-		case X:
-			return new Vec3(x + offset, y, z);
-		case Y:
-			return new Vec3(x, y + offset, z);
-		case Z:
-			return new Vec3(x, y, z + offset);
-		}
+		return switch (axis) {
+			case X -> new Vec3(x + offset, y, z);
+			case Y -> new Vec3(x, y + offset, z);
+			case Z -> new Vec3(x, y, z + offset);
+		};
 	}
 
 	@Override
@@ -240,29 +237,28 @@ public class AdvancedClimberPathNavigator<T extends Mob & IClimberEntity> extend
 				Vec3 currentDir = pos.subtract(currentTarget);
 
 				if(targetDir.dot(currentDir) > 0.0D) {
-					Direction.Axis ax, ay, az;
-					boolean invertY;
+					Direction.Axis ax = Direction.Axis.X, ay = Direction.Axis.X, az = Direction.Axis.X;
+					boolean invertY =false;
 
-					switch(this.verticalFacing.getAxis()) {
-					case X:
-						ax = Direction.Axis.Z;
-						ay = Direction.Axis.X;
-						az = Direction.Axis.Y;
-						invertY = this.verticalFacing.getStepX() < 0;
-						break;
-					default:
-					case Y:
-						ax = Direction.Axis.X;
-						ay = Direction.Axis.Y;
-						az = Direction.Axis.Z;
-						invertY = this.verticalFacing.getStepY() < 0;
-						break;
-					case Z:
-						ax = Direction.Axis.Y;
-						ay = Direction.Axis.Z;
-						az = Direction.Axis.X;
-						invertY = this.verticalFacing.getStepZ() < 0;
-						break;
+					switch (this.verticalFacing.getAxis()) {
+						case X -> {
+							ax = Direction.Axis.Z;
+							ay = Direction.Axis.X;
+							az = Direction.Axis.Y;
+							invertY = this.verticalFacing.getStepX() < 0;
+						}
+						case Y -> {
+							ax = Direction.Axis.X;
+							ay = Direction.Axis.Y;
+							az = Direction.Axis.Z;
+							invertY = this.verticalFacing.getStepY() < 0;
+						}
+						case Z -> {
+							ax = Direction.Axis.Y;
+							ay = Direction.Axis.Z;
+							az = Direction.Axis.X;
+							invertY = this.verticalFacing.getStepZ() < 0;
+						}
 					}
 
 					//Make sure that the mob can stand at the next point in the same orientation it currently has
@@ -280,39 +276,30 @@ public class AdvancedClimberPathNavigator<T extends Mob & IClimberEntity> extend
 		int sizeX = 0;//(int) this.mob.getBbWidth();
 		int sizeY = 0;//(int) this.mob.getBbHeight();
 		int sizeZ = 0;//(int) this.mob.getBbWidth();
-		switch(this.verticalFacing.getAxis()) {
-		case X:
-			return this.isDirectPathBetweenPoints(start, end, sizeX, sizeY, sizeZ, Direction.Axis.Z, Direction.Axis.X, Direction.Axis.Y, 0.0D, this.verticalFacing.getStepX() < 0);
-		case Y:
-			return this.isDirectPathBetweenPoints(start, end, sizeX, sizeY, sizeZ, Direction.Axis.X, Direction.Axis.Y, Direction.Axis.Z, 0.0D, this.verticalFacing.getStepY() < 0);
-		case Z:
-			return this.isDirectPathBetweenPoints(start, end, sizeX, sizeY, sizeZ, Direction.Axis.Y, Direction.Axis.Z, Direction.Axis.X, 0.0D, this.verticalFacing.getStepZ() < 0);
-		}
-		return false;
+		return switch (this.verticalFacing.getAxis()) {
+			case X ->
+					this.isDirectPathBetweenPoints(start, end, sizeX, sizeY, sizeZ, Direction.Axis.Z, Direction.Axis.X, Direction.Axis.Y, 0.0D, this.verticalFacing.getStepX() < 0);
+			case Y ->
+					this.isDirectPathBetweenPoints(start, end, sizeX, sizeY, sizeZ, Direction.Axis.X, Direction.Axis.Y, Direction.Axis.Z, 0.0D, this.verticalFacing.getStepY() < 0);
+			case Z ->
+					this.isDirectPathBetweenPoints(start, end, sizeX, sizeY, sizeZ, Direction.Axis.Y, Direction.Axis.Z, Direction.Axis.X, 0.0D, this.verticalFacing.getStepZ() < 0);
+		};
 	}
 
 	protected static double swizzle(Vec3 vec, Direction.Axis axis) {
-		switch(axis) {
-		case X:
-			return vec.x;
-		case Y:
-			return vec.y;
-		case Z:
-			return vec.z;
-		}
-		return 0;
+		return switch (axis) {
+			case X -> vec.x;
+			case Y -> vec.y;
+			case Z -> vec.z;
+		};
 	}
 
 	protected static int swizzle(int x, int y, int z, Direction.Axis axis) {
-		switch(axis) {
-		case X:
-			return x;
-		case Y:
-			return y;
-		case Z:
-			return z;
-		}
-		return 0;
+		return switch (axis) {
+			case X -> x;
+			case Y -> y;
+			case Z -> z;
+		};
 	}
 
 	protected static int unswizzle(int x, int y, int z, Direction.Axis ax, Direction.Axis ay, Direction.Axis az, Direction.Axis axis) {

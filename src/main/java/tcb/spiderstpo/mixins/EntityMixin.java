@@ -15,10 +15,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
 import tcb.spiderstpo.common.entity.mob.IEntityMovementHook;
 import tcb.spiderstpo.common.entity.mob.IEntityReadWriteHook;
-import tcb.spiderstpo.common.entity.mob.IEntityRegisterDataHook;
 
 @Mixin(Entity.class)
-public abstract class EntityMixin implements IEntityMovementHook, IEntityReadWriteHook, IEntityRegisterDataHook {
+public abstract class EntityMixin implements IEntityMovementHook, IEntityReadWriteHook {
 	@Inject(method = "move", at = @At("HEAD"), cancellable = true)
 	private void onMovePre(MoverType type, Vec3 pos, CallbackInfo ci) {
 		if(this.onMove(type, pos, true)) {
@@ -92,18 +91,16 @@ public abstract class EntityMixin implements IEntityMovementHook, IEntityReadWri
 	@Shadow(prefix = "shadow$")
 	private void shadow$defineSynchedData() { }
 
-	@Redirect(method = "<init>*", at = @At(
-			value = "INVOKE",
-			target = "Lnet/minecraft/world/entity/Entity;defineSynchedData()V"
-			))
-	private void onRegisterData(Entity _this) {
-		this.shadow$defineSynchedData();
-		
-		if(_this == (Object) this) {
-			this.onRegisterData();
-		}
-	}
+//	@Redirect(method = "<init>*", at = @At(
+//			value = "INVOKE",
+//			target = "Lnet/minecraft/world/entity/Entity;defineSynchedData()V"
+//			))
+//	private void onRegisterData(Entity _this) {
+//		this.shadow$defineSynchedData();
+//
+//		if(_this == (Object) this) {
+//			this.onRegisterData();
+//		}
+//	}
 
-	@Override
-	public void onRegisterData() { }
 }

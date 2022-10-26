@@ -47,7 +47,6 @@ import tcb.spiderstpo.common.Matrix4f;
 import tcb.spiderstpo.common.entity.mob.IClimberEntity;
 import tcb.spiderstpo.common.entity.mob.IEntityMovementHook;
 import tcb.spiderstpo.common.entity.mob.IEntityReadWriteHook;
-import tcb.spiderstpo.common.entity.mob.IEntityRegisterDataHook;
 import tcb.spiderstpo.common.entity.mob.ILivingEntityDataManagerHook;
 import tcb.spiderstpo.common.entity.mob.ILivingEntityJumpHook;
 import tcb.spiderstpo.common.entity.mob.ILivingEntityLookAtHook;
@@ -71,7 +70,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Mixin(value = { Spider.class })
-public abstract class ClimberEntityMixin extends PathfinderMob implements IClimberEntity, IMobEntityLivingTickHook, ILivingEntityLookAtHook, IMobEntityTickHook, ILivingEntityRotationHook, ILivingEntityDataManagerHook, ILivingEntityTravelHook, IEntityMovementHook, IEntityReadWriteHook, IEntityRegisterDataHook, ILivingEntityJumpHook {
+public abstract class ClimberEntityMixin extends PathfinderMob implements IClimberEntity, IMobEntityLivingTickHook, ILivingEntityLookAtHook, IMobEntityTickHook, ILivingEntityRotationHook, ILivingEntityDataManagerHook, ILivingEntityTravelHook, IEntityMovementHook, IEntityReadWriteHook, ILivingEntityJumpHook {
 
 	//Copy from LivingEntity
 	private static final UUID SLOW_FALLING_ID = UUID.fromString("A5B6CF2A-2F7C-31EF-9022-7C3E7D5E6ABA");
@@ -165,7 +164,11 @@ public abstract class ClimberEntityMixin extends PathfinderMob implements IClimb
 		ci.setReturnValue(navigate);
 	}
 
-	@Override
+	@Inject(method = "defineSynchedData", at = @At("RETURN"))
+	public void onDefineSynchedData(CallbackInfo ci){
+		onRegisterData();
+	}
+
 	public void onRegisterData() {
 		if(this.shouldTrackPathingTargets()) {
 			this.entityData.define(MOVEMENT_TARGET_X, 0.0f);

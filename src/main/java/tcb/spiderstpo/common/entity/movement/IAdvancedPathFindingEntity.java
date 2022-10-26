@@ -46,13 +46,13 @@ public interface IAdvancedPathFindingEntity {
 	}
 
 	/**
-	 * Returns the pathing malus for the given {@link PathNodeType} and block position.
+	 * Returns the pathing malus for the given {@link BlockPathTypes} and block position.
 	 * Nodes with negative values are avoided at all cost. Nodes with value 0.0 have the highest priority, i.e.
 	 * are preferred over all other nodes. Nodes with a positive value incur an additional travel cost of the same magnitude
 	 * and the higher their value the less they are preferred. Note that the additional travel cost increases the path's "length" (i.e. cost)
 	 * and thus decreases the actual maximum path length in blocks.
 	 * @param cache
-	 * @param type
+	 * @param nodeType
 	 * @param pos
 	 * @param direction
 	 * @param sides
