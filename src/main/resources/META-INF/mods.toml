@@ -20,10 +20,10 @@ issueTrackerURL="http://my.issue.tracker/" #optional
 [[mods]]
 
 # The modid of the mod
-modId="spiderstpo"
+modId="${mod_id}"
 
 # The version number of the mod - there's a few well known ${} variables useable here or just hardcode it
-version="${file.jarVersion}" #mandatory
+version="${mod_version}" #mandatory
 
  # A display name for the mod
 displayName="Spiders 2.0"
@@ -37,16 +37,16 @@ Vanilla spiders are not yet creepy enough for you? You wish spiders would §oact
 Spiders 2.0 enables spiders to walk along walls and ceilings and it also improves their AI such that they can find their way around almost any obstacle!
 '''
 
-[[dependencies.spiderstpo]]
+[[dependencies.${mod_id}]]
     modId="forge"
     mandatory=true
     versionRange="[34,)"
     ordering="NONE"
     side="BOTH"
     
-[[dependencies.spiderstpo]]
+[[dependencies.${mod_id}]]
     modId="minecraft"
     mandatory=true
-    versionRange="[1.16.4]"
+    versionRange="[1.16.4,)"
     ordering="NONE"
     side="BOTH"
